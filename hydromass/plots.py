@@ -946,10 +946,6 @@ def mass_from_samples(Mhyd, model, rin=None, rout=None, npt=200, plot=False):
 
         mbar = mstar_m[:, np.newaxis] + mgas
 
-        g_bar_t = mbar * const_G_Msun_kpc / rout_m[:, np.newaxis] ** 2
-
-        g_bar, g_barl, g_barh = np.percentile(g_bar_t, [50., 50. - 68.3 / 2., 50. + 68.3 / 2.], axis = 1)
-
         if model.massmod in ['NFW+SERSIC']:
 
             mass, mass_0, mass_1 = [Mhyd.mfact * v * 1e13 for v in model.func_np(rout_m, Mhyd.samppar, delta = model.delta, return_separate = True)]
@@ -989,6 +985,14 @@ def mass_from_samples(Mhyd, model, rin=None, rout=None, npt=200, plot=False):
             g_tot_t = mass.T * const_G_Msun_kpc / rout_m[:, np.newaxis] ** 2
 
             g_tot, g_totl, g_toth = np.percentile(g_tot_t, [50., 50. - 68.3 / 2., 50. + 68.3 / 2.], axis = 1)
+
+        g_bar_t = mbar * const_G_Msun_kpc / rout_m[:, np.newaxis] ** 2
+
+        if model.massmod in ['NFW+SERSIC']:
+
+            g_bar_t += mass_1.T * const_G_Msun_kpc / rout_m[:, np.newaxis] ** 2
+
+        g_bar, g_barl, g_barh = np.percentile(g_bar_t, [50., 50. - 68.3 / 2., 50. + 68.3 / 2.], axis = 1)
 
         fg, fgl, fgh = np.percentile(fgas, [50., 50. - 68.3 / 2., 50. + 68.3 / 2.], axis=1)
 
