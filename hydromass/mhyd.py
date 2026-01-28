@@ -349,15 +349,11 @@ def Run_Mhyd_PyMC3(Mhyd,model,bkglim=None,nmcmc=1000,fit_bkg=False,back=None,
 
                 if model.massmod == 'EIN3':
 
-                    print('using truncated normal priors')
-
                     print(f'pm.TruncatedNormal({name}, mu={model.start[i]}, sigma={model.sd[i]}, lower={lim[0]}, upper={lim[1]})')
 
                     pymc_vars[name] = pm.TruncatedNormal(name, mu=model.start[i], sigma=model.sd[i], lower=lim[0], upper=lim[1])
 
                 else:
-
-                    print('using uniform priors')
 
                     print(f'pm.Uniform({name}, lower={lim[0]}, upper={lim[1]})')
 
