@@ -873,12 +873,17 @@ def Run_Forward_PyMC3(Mhyd,Forward, bkglim=None,nmcmc=1000,fit_bkg=False,back=No
 
                 if name == 'p0':
 
+                    print(f'pm.TruncatedNormal({name}, mu={np.log(Forward.start[i])}, sigma={Forward.sd[i] / Forward.start[i]}, '
+                          f'lower= {np.log(lim[0])}, upper= {np.log(lim[1])})')
+
                     tpar = pm.TruncatedNormal(name, mu=np.log(Forward.start[i]), sigma=Forward.sd[i] / Forward.start[i],
                                                 lower=np.log(lim[0]), upper=np.log(lim[1])) #log-normal prior on normalization
 
                     modpar = pm.math.exp(tpar)
 
                 else:
+
+                    print(f'pm.TruncatedNormal({name}, mmu={Forward.start[i]}, sigma={Forward.sd[i]},lower={lim[0]}, upper={lim[1]})')
 
                     modpar = pm.TruncatedNormal(name, mu=Forward.start[i], sigma=Forward.sd[i],
                                                 lower=lim[0], upper=lim[1]) #Gaussian prior on other parameters
@@ -887,6 +892,8 @@ def Run_Forward_PyMC3(Mhyd,Forward, bkglim=None,nmcmc=1000,fit_bkg=False,back=No
                 dummy = pm.Normal('dummy'+name, mu=0., sigma=1.)
 
                 dummy_param = 0 * dummy + Forward.start[i]
+
+                print(f'pm.Deterministic({name}, {dummy_param})')
 
                 modpar = pm.Deterministic(name, dummy_param)
 
