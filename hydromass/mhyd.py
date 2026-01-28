@@ -118,6 +118,7 @@ def Run_Mhyd_PyMC3(Mhyd,model,bkglim=None,nmcmc=1000,fit_bkg=False,back=None,
     if prof.counts is not None:
         counts = prof.counts.astype('int32')
         bkgcounts = prof.bkgcounts.astype('float32')
+    else:
         if fit_bkg:
             print('The fit_bkg option can only be used when fitting counts, which are not available. Reverting to default')
             fit_bkg = False
@@ -336,6 +337,8 @@ def Run_Mhyd_PyMC3(Mhyd,model,bkglim=None,nmcmc=1000,fit_bkg=False,back=None,
 
         initvals = dict()
 
+        pymc_vars = dict()
+
         for i in range(model.npar):
 
             name = model.parnames[i]
@@ -347,21 +350,29 @@ def Run_Mhyd_PyMC3(Mhyd,model,bkglim=None,nmcmc=1000,fit_bkg=False,back=None,
                 if model.massmod == 'EIN3':
 
                     print('using truncated normal priors')
-                    modpar = pm.TruncatedNormal(name, mu=model.start[i], sigma=model.sd[i], lower=lim[0], upper=lim[1])
+
+                    print(f'pm.TruncatedNormal({name}, mu={model.start[i]}, sigma={model.sd[i]}, lower={lim[0]}, upper={lim[1]})')
+
+                    pymc_vars[name] = pm.TruncatedNormal(name, mu=model.start[i], sigma=model.sd[i], lower=lim[0], upper=lim[1])
 
                 else:
-                    print('using uniform priors')
-                    modpar = pm.Uniform(name, lower=lim[0], upper=lim[1])
 
-                initvals[name] = model.start[i]
+                    print('using uniform priors')
+
+                    print(f'pm.Uniform({name}, lower={lim[0]}, upper={lim[1]})')
+
+                    pymc_vars[name] = pm.Uniform(name, lower=lim[0], upper=lim[1])
+
+                    initvals[name] = model.start[i]
 
             else:
 
-                modpar = pm.Deterministic(name, pm.math.constant(model.start[i]))
+                print(f'pm.Deterministic({name}, pm.math.constant({model.start[i]}))')
+                pymc_vars[name] = pm.Deterministic(name, pm.math.constant(model.start[i]))
 
                 # modpar = pm.ConstantDist(name, model.start[i]) # This does not work anymore in pymc
 
-            allpmod.append(modpar)
+            allpmod.append(pymc_vars[name])
 
         pmod = pm.math.stack(allpmod, axis=0)
 
@@ -557,6 +568,10 @@ def Run_Mhyd_PyMC3(Mhyd,model,bkglim=None,nmcmc=1000,fit_bkg=False,back=None,
 
                 count_obs = pm.Poisson('counts', mu=pred, observed=counts) #counts likelihood
 
+                sbmod = pred * elongation
+
+                sb_obs = pm.Deterministic('sb', sbmod[valid])  # Sx: only saved here
+
             else:
 
                 sbmod = pred * elongation
@@ -750,7 +765,7 @@ def Run_Mhyd_PyMC3(Mhyd,model,bkglim=None,nmcmc=1000,fit_bkg=False,back=None,
 
             sampb = np.array(trace.posterior['bkg']).flatten()
 
-            samples = np.append(sampc, sampb, axis=1)
+            samples = np.vstack((sampc.T, sampb)).T #np.append(sampc, sampb, axis=1)
 
         else:
             samples = sampc
