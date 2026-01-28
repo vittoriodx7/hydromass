@@ -366,9 +366,12 @@ def variable_ccf(Mhyd, cosmo, z, nh, rmf, method='interp', abund='aspl', elow=0.
 
         fill_value = (spec_data.temp_x[0], spec_data.temp_x[nkt - 1])
 
-        fint = interp1d(spec_data.rref_x_am, medsmooth(spec_data.temp_x), kind='cubic', fill_value=fill_value,
+        if len(spec_data.rref_x_am) > 3:
+            fint = interp1d(spec_data.rref_x_am, medsmooth(spec_data.temp_x), kind='cubic', fill_value=fill_value,
                         bounds_error=False)
-
+        else:
+            fint = interp1d(spec_data.rref_x_am, medsmooth(spec_data.temp_x), fill_value = fill_value,
+                            bounds_error = False)
 
         ktprof = fint(bins)
 
