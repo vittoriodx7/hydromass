@@ -889,13 +889,15 @@ def Run_Forward_PyMC3(Mhyd,Forward, bkglim=None,nmcmc=1000,fit_bkg=False,back=No
                                                 lower=lim[0], upper=lim[1]) #Gaussian prior on other parameters
             else:
 
-                dummy = pm.Normal('dummy'+name, mu=0., sigma=1.)
+                # dummy = pm.Normal('dummy'+name, mu=0., sigma=1.)
+                #
+                # dummy_param = 0 * dummy + Forward.start[i]
+                #
+                # modpar = pm.Deterministic(name, dummy_param)
 
-                dummy_param = 0 * dummy + Forward.start[i]
+                print(f'pm.Deterministic({name}, pm.math.constant({Forward.start[i]}))')
 
-                print(f'pm.Deterministic({name}, {dummy_param})')
-
-                modpar = pm.Deterministic(name, dummy_param)
+                modpar = pm.Deterministic(name, pm.math.constant(Forward.start[i]))
 
             allpmod.append(modpar)
 
