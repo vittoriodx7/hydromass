@@ -817,7 +817,7 @@ def ReloadForward(Mhyd, infile):
 
     if 'LXFACT' in tabccf.names:
 
-        Mhyd.lumfact = 1e43 * 10 ** (tabccf['LXFACT']-43)
+        Mhyd.lumfact = 1e43 * 10 ** (tabccf['LXFACT'].astype(np.float64)-43)
 
     modhead = fin[2].header
 
