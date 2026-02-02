@@ -1,9 +1,12 @@
 import numpy as np
+import arviz as az
 
 from .plots import *
 from .functions import *
 from .nonparametric import *
 from .forward import *
+
+__all__ = ['SaveModel', 'ReloadModel', 'SaveGP', 'ReloadGP', 'SaveForward', 'ReloadForward', 'SaveProfiles', 'LoadProfiles']
 
 def SaveModel(Mhyd, model, outfile=None):
     '''
@@ -163,6 +166,10 @@ def SaveModel(Mhyd, model, outfile=None):
 
     hdus.writeto(outfile, overwrite=True)
 
+    # Save also pymc trace
+
+    az.to_netcdf(Mhyd.trace, f'{outfile}.nc')
+
 
 def ReloadModel(Mhyd, infile, mstar=None):
     '''
@@ -222,7 +229,7 @@ def ReloadModel(Mhyd, infile, mstar=None):
 
     if 'LXFACT' in tabccf.names:
 
-        Mhyd.lumfact = 1e43 * 10 ** (tabccf['LXFACT']-43)
+        Mhyd.lumfact = 1e43 * 10 ** (tabccf['LXFACT'].astype(np.float64)-43)
 
     if is_elong:
 
@@ -407,6 +414,10 @@ def ReloadModel(Mhyd, infile, mstar=None):
             Mhyd.pmod_lo = plo
             Mhyd.pmod_hi = phi
 
+    # Reload trace
+
+    Mhyd.trace = az.from_netcdf(f'{infile}.nc')
+
     return mod
 
 def SaveGP(Mhyd, outfile=None):
@@ -531,7 +542,7 @@ def ReloadGP(Mhyd, infile):
 
     if 'LXFACT' in tabccf.names:
 
-        Mhyd.lumfact = 1e43 * 10 ** (tabccf['LXFACT']-43)
+        Mhyd.lumfact = 1e43 * 10 ** (tabccf['LXFACT'].astype(np.float64)-43)
 
     Mhyd.samppar = fin[2].data
 
@@ -782,6 +793,10 @@ def SaveForward(Mhyd, Forward, outfile=None):
 
     hdus.writeto(outfile, overwrite=True)
 
+    # Save also pymc trace
+
+    az.to_netcdf(Mhyd.trace, f'{outfile}.nc')
+
 def ReloadForward(Mhyd, infile):
     '''
     Reload the results of a previous forward fit saved using the :func:`hydromass.save.SaveForward` function into the current live session
@@ -954,6 +969,11 @@ def ReloadForward(Mhyd, infile):
         Mhyd.pmod = pmed
         Mhyd.pmod_lo = plo
         Mhyd.pmod_hi = phi
+
+
+    # Reload trace
+
+    Mhyd.trace = az.from_netcdf(f'{infile}.nc')
 
     return mod
 
