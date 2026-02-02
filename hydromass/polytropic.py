@@ -4,6 +4,9 @@ from .plots import rads_more, get_coolfunc, plt
 from .functions import ArcTan
 import pymc as pm
 
+__all__ = ['func_poly_rad_pm', 'func_poly_rad_np', 'func_poly_dens_pm', 'func_poly_dens_np', 'gradP_gamman', 'kt_poly_from_samples',
+           'P_poly_from_samples', 'mass_poly_from_samples', 'prof_poly_hires', 'Polytropic', 'Run_Polytropic_PyMC3']
+
 tt_arctan = ArcTan()
 
 # Gamma(R) function

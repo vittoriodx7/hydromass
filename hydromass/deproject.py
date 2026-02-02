@@ -6,6 +6,10 @@ import time
 import pymc as pm
 import sys
 
+__all__ = ['calc_linear_operator', 'list_params', 'calc_sb_operator', 'calc_sb_operator_psf', 'calc_int_operator', 'list_params_density',
+           'calc_density_operator', 'calc_density_operator_pm', 'calc_grad_operator', 'elongation_correction', 'elongation_correction_np',
+           'MyDeprojVol']
+
 # Function to calculate a linear operator transforming parameter vector into predicted model counts
 
 def calc_linear_operator(rad,sourcereg,pars,area,expo,psf):

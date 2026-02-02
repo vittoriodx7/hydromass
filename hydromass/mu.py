@@ -1,5 +1,7 @@
 import numpy as np
 
+__all__ = ['mean_molecular_weights']
+
 def mean_molecular_weights(infile, abund='aspl', Zs=0.3):
     '''
     Calculation of mean molecular weights given an abundance table and a metallicity. The function reads the abundance table from a file located in the hydromass databse and that is copied from the XSPEC abundance table implementation. The abundance table is then used to calculate the mean molecular weight, the number ratio of electrons to ions, and the mean molecular weight per electron.

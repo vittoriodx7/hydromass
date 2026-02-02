@@ -4,6 +4,10 @@ from .deproject import *
 from .plots import rads_more, get_coolfunc, plt
 from .constants import *
 
+
+__all__ = ['gnfw_pm', 'gnfw_np', 'der_lnP_np', 'kt_forw_from_samples', 'P_forw_from_samples', 'mass_forw_from_samples', 'prof_forw_hires',
+           'Forward', 'Run_Forward_PyMC3']
+
 # GNFW function should work both for numpy.ndarray and pymc3/theano formats
 def gnfw_pm(rad, p0, c500, gamma, alfa, beta):
     '''

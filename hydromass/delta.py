@@ -5,6 +5,12 @@ import matplotlib.pyplot as plt
 from .deproject import calc_density_operator, calc_grad_operator, calc_sb_operator, MyDeprojVol
 from .plots import rads_more
 from astropy.io import fits
+from scipy.optimize import brentq
+from scipy.optimize import minimize
+
+__all__ = ['delta_func', 'mgas_delta', 'mbar_overdens', 'calc_rdelta_mdelta', 'calc_rdelta_mdelta_GP', 'calc_rdelta_mdelta_forward',
+           'calc_rdelta_mdelta_forward', 'calc_rdelta_mdelta_polytropic', 'write_all_mdelta', 'write_all_mdelta_GP', 'write_covmat',
+           'write_all_mdelta_forward']
 
 def delta_func(r, Mhyd, model, pars):
     """
@@ -276,7 +282,6 @@ def calc_rdelta_mdelta(delta, Mhyd, model, plot=False, r0=500., rmax=4000., thin
         return dict
 
 
-from scipy.optimize import brentq
 
 
 def calc_rdelta_mdelta_GP(delta, Mhyd, plot=False, r0=500., thin=10):
@@ -405,9 +410,6 @@ def calc_rdelta_mdelta_GP(delta, Mhyd, plot=False, r0=500., thin=10):
     else:
 
         return dict
-
-
-from scipy.optimize import minimize
 
 
 def calc_rdelta_mdelta_forward(delta, Mhyd, Forward, plot=False, r0=500., rmax=4000., thin=10):

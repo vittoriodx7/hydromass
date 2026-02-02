@@ -4,6 +4,10 @@ from .plots import rads_more, get_coolfunc, estimate_T0, plt
 from scipy.interpolate import interp1d
 import pymc as pm
 
+
+__all__ = ['calc_gp_operator', 'calc_gp_operator_lognormal', 'calc_gp_grad_operator', 'calc_gp_grad_operator_lognormal', 'kt_GP_from_samples',
+           'P_GP_from_samples', 'mass_GP_from_samples', 'prof_GP_hires', 'Run_NonParametric_PyMC3']
+
 # Function to compute linear operator transforming norms of GP model into radial profile
 
 def calc_gp_operator(npt, rads, rin, rout, bin_fact=1.0, smin=None, smax=None):

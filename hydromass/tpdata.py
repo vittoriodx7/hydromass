@@ -8,6 +8,7 @@ import astropy.units as u
 from. constants import ckms
 import math
 
+__all__ = ['SBData', 'SpecData', 'SZData', 'WLData', 'VelocityData']
 
 class SBData:
     def __init__(self, bins, ebins, profile, eprofile, area, effexp):

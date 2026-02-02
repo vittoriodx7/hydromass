@@ -32,6 +32,8 @@ from .save import *
 from .wl import WLmodel
 import arviz as az
 
+__all__ = ['Run_Mhyd_PyMC3', 'Mhyd']
+
 def Run_Mhyd_PyMC3(Mhyd,model,bkglim=None,nmcmc=1000,fit_bkg=False,back=None,
                    samplefile=None,nrc=None,nbetas=6,min_beta=0.6, nmore=5,
                    p0_prior=None, tune=500, dmonly=False, mstar=None, find_map=True,
