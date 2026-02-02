@@ -264,7 +264,7 @@ def P_forw_from_samples(Mhyd, Forward, nmore=5):
     return pmed, plo, phi
 
 
-def mass_forw_from_samples(Mhyd, Forward, rin=None, rout=None, npt=200, plot=False, nmore=5):
+def mass_forw_from_samples(Mhyd, Forward, rin=None, rout=None, npt=200, plot=False, nmore=5, mstar=None):
     '''
     Compute the best-fit forward mass model and its 1-sigma error envelope from a loaded Forward run. 
 
@@ -276,6 +276,8 @@ def mass_forw_from_samples(Mhyd, Forward, rin=None, rout=None, npt=200, plot=Fal
     :type plot: bool
     :param nmore: Number of points defining fine grid, must be equal to the value used for the mass reconstruction. Defaults to 5
     :type nmore: int
+    :param mstar: Provide an array containing the cumulative stellar mass profile
+    :type mstar: numpy.ndarray
     :return: Dictionary containing the profiles of hydrostatic mass, gas mass, and gas fraction
     :rtype: dict(11xnpt)
     '''
@@ -359,6 +361,28 @@ def mass_forw_from_samples(Mhyd, Forward, rin=None, rout=None, npt=200, plot=Fal
 
     fg, fgl, fgh = np.percentile(fgas, [50., 50. - 68.3 / 2., 50. + 68.3 / 2.], axis=1)
 
+    if mstar is not None:
+
+        r_mstar = mstar[:, 0]
+
+        cum_mstar = mstar[:, 1]
+
+        mstar_m = np.interp(rout_m, r_mstar, cum_mstar)
+
+    else:
+
+        mstar_m = np.zeros(nvalm)
+
+    mbar = mstar_m[:, np.newaxis] + mgas
+
+    g_bar_t = mbar * const_G_Msun_kpc / rout_m[:, np.newaxis] ** 2
+
+    g_bar, g_barl, g_barh = np.percentile(g_bar_t, [50., 50. - 68.3 / 2., 50. + 68.3 / 2.], axis = 1)
+
+    g_tot_t = mass * const_G_Msun_kpc / rout_m[:, np.newaxis] ** 2
+
+    g_tot, g_totl, g_toth = np.percentile(g_tot_t, [50., 50. - 68.3 / 2., 50. + 68.3 / 2.], axis = 1)
+
     dict = {
         "R_IN": rin_m,
         "R_OUT": rout_m,
@@ -370,7 +394,13 @@ def mass_forw_from_samples(Mhyd, Forward, rin=None, rout=None, npt=200, plot=Fal
         "MGAS_HI": mgh,
         "FGAS": fg,
         "FGAS_LO": fgl,
-        "FGAS_HI": fgh
+        "FGAS_HI": fgh,
+        "g_BAR": g_bar,
+        "g_BAR_LO": g_barl,
+        "g_BAR_HI": g_barh,
+        "g_OBS": g_tot,
+        "g_OBS_LO": g_totl,
+        "g_OBS_HI": g_toth,
     }
 
     if plot:
