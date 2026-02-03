@@ -900,7 +900,7 @@ def ReloadForward(Mhyd, infile):
 
         Ksb = calc_sb_operator(rad, sourcereg, pars, withbkg=False)
 
-        Mhyd.K = np.dot(prof.psfmat, Ksb)  # transformation to surface brightness
+        Mhyd.K = np.dot(psfmat, Ksb)  # transformation to surface brightness
 
         Mhyd.Kdens = calc_density_operator(rad, Mhyd.pardens, Mhyd.amin2kpc, withbkg=False)
 
