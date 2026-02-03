@@ -9,7 +9,7 @@ from .plots import rads_more
 
 __all__ = ['delta_func', 'mgas_delta', 'mbar_overdens', 'calc_rdelta_mdelta', 'calc_rdelta_mdelta_GP', 'calc_rdelta_mdelta_forward',
            'calc_rdelta_mdelta_forward', 'calc_rdelta_mdelta_polytropic', 'write_all_mdelta', 'write_all_mdelta_GP', 'write_covmat',
-           'write_all_mdelta_forward']
+           'write_all_mdelta_forward', 'proxies_forward']
 
 def delta_func(r, Mhyd, model, pars):
     """
