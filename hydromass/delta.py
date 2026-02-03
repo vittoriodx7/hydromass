@@ -965,3 +965,186 @@ def write_all_mdelta_forward(Mhyd, Forward, outfile=None, r0=500., thin=10):
         write_covmat(covmat, outcov, res, delta)
 
     fout.close()
+
+
+def proxies_forward(radius, Mhyd, Forward, cefraction=0.15, thin=10, rmax=4000):
+    '''
+    Within a vector of input radii, compute integrated quantities and their uncertainties from a loaded Forward mass reconstruction fit. If the provided radius is a scalar, all the quantities will be extracted within the same aperture. Otherwise, the code will draw random values from the provided vector and integrate the proxies within the corresponding aperture. The code returns a dictionary containing estimates of $M_{gas}$, $L_X$, $T_X$, $Y_X$, and core-excised quantities.
+
+    :param radius: Radii out to which the integrated quantities will be calculated
+    :type radius: numpy.ndarray
+    :param Mhyd: :class:`hydromass.mhyd.Mhyd` object containing the results of mass reconstruction run
+    :type Mhyd: class:`hydromass.mhyd.Mhyd`
+    :param Forward: :class:`hydromass.forward.Forward` model
+    :type Forward: class:`hydromass.forward.Forward`
+    :param cefraction: Fraction of the radial range to excise for core-excised quantities
+    :type cefraction: float
+    :param thin: Thinning factor for the calculation. If the number of samples is large the calculation can be long. If thin is greater than 1 then the calculation while be done for fewer samples every "thin" value. Defaults to 10.
+    :type thin: int
+    :return:  Dictionary containing values of proxies and their 1-sigma percentiles, covariance matrix
+    :rtype:
+        - dict{12xfloat}
+        - numpy.ndarray
+    '''
+
+    rout = np.logspace(np.log10(Mhyd.sbprof.bins[0] * Mhyd.amin2kpc), np.log10(rmax), 100)
+
+    rin = np.roll(rout, 1)
+
+    rin[0] = 0.
+
+    rref = (rin + rout) / 2.
+
+    dr = (rout - rin) / Mhyd.amin2kpc
+
+    area = 2. * np.pi * rref / Mhyd.amin2kpc * dr
+
+    try:
+        nn = len(Mhyd.lumfact)
+
+    except TypeError:
+
+        lf = Mhyd.lumfact
+
+    else:
+        lf = np.interp(rref / Mhyd.amin2kpc, Mhyd.sbprof.bins, Mhyd.lumfact)  # luminosity conversion factor
+
+    sourcereg = np.where(rref < rmax)
+
+    Ksb = calc_sb_operator(rref / Mhyd.amin2kpc, sourcereg, Mhyd.pars, withbkg=Mhyd.fit_bkg)
+
+    rin_m, rout_m, index_x, index_sz, sum_mat, ntm = rads_more(Mhyd, nmore=Mhyd.nmore)
+
+    Kdens = calc_density_operator(rref / Mhyd.amin2kpc, Mhyd.pardens, Mhyd.amin2kpc, withbkg=Mhyd.fit_bkg)
+
+    if Mhyd.cf_prof is not None:
+
+        rref = (rin + rout) / 2.
+
+        rad = Mhyd.sbprof.bins
+
+        cfp = np.interp(rref, rad * Mhyd.amin2kpc, Mhyd.ccf)
+
+    else:
+
+        cfp = Mhyd.ccf
+
+    try:
+        nrad = len(radius)
+
+    except TypeError:
+        scalar = True
+        nrad = 1
+    else:
+        scalar = False
+        nrad = len(radius)
+
+    nsamp = int(len(Mhyd.samppar) / thin)
+
+    mgdelta, lxdelta, lxcedelta, ktdelta, ktcedelta = np.empty(nsamp), np.empty(nsamp), np.empty(nsamp), np.empty(nsamp), np.empty(nsamp)
+
+    radii = np.empty(nsamp)
+
+    for i in range(nsamp):
+
+        ti = i * thin
+
+        tpar = np.array([Mhyd.samppar[ti]])
+
+        coefs = Mhyd.samples[ti]
+
+        dens = np.sqrt(np.dot(Kdens, np.exp(coefs)) / cfp * Mhyd.transf)
+
+        sb = np.dot(Ksb, np.exp(coefs))
+
+        weights = area * sb
+
+        lumin = weights * lf
+
+        cslum = np.cumsum(lumin)
+
+        if nrad>1:
+            r500 = np.random.choice(radius)
+        else:
+            r500 = radius
+
+        mgdelta[i] = mgas_delta(r500, Mhyd.samples[ti], Mhyd, fit_bkg=Mhyd.fit_bkg, rout_m=rout_m)
+
+        lxdelta[i] = np.interp(r500, rref, cslum)
+
+        rce = cefraction * r500
+        nocore = np.where(rref>=rce)
+        cslum_ce = np.cumsum(lumin[nocore])
+        lxcedelta[i] = np.interp(r500, rref[nocore], cslum_ce)
+
+        p3d = Forward.func_np(rref, tpar)
+
+        reg = np.where(rref <= r500)
+
+        vx = MyDeprojVol(rin[reg] / Mhyd.amin2kpc, rout[reg] / Mhyd.amin2kpc)
+
+        vol_x = vx.deproj_vol().T
+
+        t3d = p3d.flatten()[reg] / dens[reg]
+
+        ei = dens[reg] ** 2 * t3d[reg] ** (-0.75)
+
+        flux = np.dot(vol_x, ei)
+
+        tproj = np.dot(vol_x, t3d * ei) / flux
+
+        ktdelta[i] = np.average(tproj, weights=weights[reg])
+
+        regce = np.where(rref[reg] >= cefraction * r500)
+
+        ktcedelta[i] = np.average(tproj[regce], weights=weights[reg][regce])
+
+        radii[i] = r500
+
+    mgd, mgdlo, mgdhi = np.percentile(mgdelta, [50., 50. - 68.3 / 2., 50. + 68.3 / 2.])
+
+    lxd, lxdlo, lxdhi = np.percentile(lxdelta, [50., 50. - 68.3 / 2., 50. + 68.3 / 2.])
+
+    lxced, lxcedlo, lxcedhi = np.percentile(lxcedelta, [50., 50. - 68.3 / 2., 50. + 68.3 / 2.])
+
+    ktd, ktdlo, ktdhi = np.percentile(ktdelta, [50., 50. - 68.3 / 2., 50. + 68.3 / 2.])
+
+    ktced, ktcedlo, ktcedhi = np.percentile(ktcedelta, [50., 50. - 68.3 / 2., 50. + 68.3 / 2.])
+
+    yxdelta = mgdelta * ktdelta
+
+    yxd, yxdlo, yxdhi = np.percentile(yxdelta, [50., 50. - 68.3 / 2., 50. + 68.3 / 2.])
+
+    all_vals = np.empty((7, nsamp))
+    all_vals[0] = radii
+    all_vals[1] = mgdelta
+    all_vals[2] = lxdelta
+    all_vals[3] = ktdelta
+    all_vals[4] = lxcedelta
+    all_vals[5] = ktcedelta
+    all_vals[6] = yxdelta
+
+    covmat = np.corrcoef(all_vals)
+
+    dict = {
+        "MGAS": mgd,
+        "MGAS_LO": mgdlo,
+        "MGAS_HI": mgdhi,
+        "LX": lxd,
+        "LX_LO": lxdlo,
+        "LX_HI": lxdhi,
+        "LXCE": lxced,
+        "LXCE_LO": lxcedlo,
+        "LXCE_HI": lxcedhi,
+        "TX": ktd,
+        "TX_LO": ktdlo,
+        "TX_HI": ktdhi,
+        "TXCE": ktced,
+        "TXCE_LO": ktcedlo,
+        "TXCE_HI": ktcedhi,
+        "YX": yxd,
+        "YX_LO": yxdlo,
+        "YX_HI": yxdhi
+    }
+
+    return dict, covmat
