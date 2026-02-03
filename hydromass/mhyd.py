@@ -429,6 +429,9 @@ def Run_Mhyd_PyMC3(Mhyd,model,bkglim=None,nmcmc=1000,fit_bkg=False,back=None,
                                        lower=np.log(P0_est) - np.log(10),
                                        upper=np.log(P0_est) + np.log(10))
 
+            print(f"logp0 = pm.TruncatedNormal('logp0', mu={np.log(P0_est)}, sigma={err_P0_est / P0_est}, "
+                  f"lower={np.log(P0_est) - np.log(10)}, upper={np.log(P0_est) + np.log(10)})")
+
             if pnt :
 
                 if pnt_model=='Angelinelli':
@@ -993,7 +996,7 @@ class Mhyd:
     """
 
     def __init__(self, sbprofile=None, spec_data=None, sz_data=None, wl_data=None, vel_data=None, directory=None, redshift=None, cosmo=None,
-                 abund = 'aspl', Zs=0.3, max_rad=4000):
+                 abund = 'aspl', Zs=0.3, max_rad=3000):
 
         file_abund = get_data_file_path('abundances.dat')
 

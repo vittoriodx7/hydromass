@@ -101,7 +101,7 @@ def cumsum_mat(nval):
     return  totmat
 
 
-def rads_more(Mhyd, nmore=5, extend=False, rmax_sb=4000):
+def rads_more(Mhyd, nmore=5, extend=False):
     """
 
     Return grid of (in, out) radii from X-ray, SZ data or both. Concatenates radii if necessary, then computes a grid of radii.
@@ -164,7 +164,11 @@ def rads_more(Mhyd, nmore=5, extend=False, rmax_sb=4000):
     # Move the outer boundary to the edge of the SB profile if it is farther out
     sbprof = Mhyd.sbprof
 
-    rmax_sb = max(rmax_sb, np.max(sbprof.bins) * Mhyd.amin2kpc)
+    rmax_sb = max(Mhyd.max_rad, np.max(sbprof.bins) * Mhyd.amin2kpc)
+
+    if rmax_sb > Mhyd.max_rad:
+
+        Mhyd.max_rad = rmax_sb
 
     if rmax_sb > np.max(rout_more):
         nvm = len(rout_more)
@@ -359,7 +363,11 @@ def estimate_P0(Mhyd, dens='sb', outfile=None):
     pars_press[0] = 10 ** res['x'][0]
     pars_press[1] = res['x'][1]
 
-    p0 = gnfw_p0(maxrad, pars_press)
+    if maxrad > Mhyd.max_rad:
+
+        Mhyd.max_rad = maxrad
+
+    p0 = gnfw_p0(Mhyd.max_rad, pars_press)
 
     if outfile is not None:
 
