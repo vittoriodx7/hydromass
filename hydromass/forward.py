@@ -792,7 +792,7 @@ def Run_Forward_PyMC3(Mhyd,Forward, bkglim=None,nmcmc=1000,fit_bkg=False,back=No
 
         Ksb = calc_sb_operator(rad, sourcereg, pars, withbkg=False)
 
-        K = np.dot(prof.psfmat, Ksb)
+        K = np.dot(psfmat, Ksb)
 
     # Set up initial values
     if np.isnan(sb[0]) or sb[0] <= 0:

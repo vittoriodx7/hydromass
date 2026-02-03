@@ -101,7 +101,7 @@ def cumsum_mat(nval):
     return  totmat
 
 
-def rads_more(Mhyd, nmore=5, extend=False, rmax_sb=4000):
+def rads_more(Mhyd, nmore=5, extend=False, rmax_sb=2000):
     """
 
     Return grid of (in, out) radii from X-ray, SZ data or both. Concatenates radii if necessary, then computes a grid of radii.
