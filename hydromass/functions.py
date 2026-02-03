@@ -3,7 +3,8 @@ import scipy.special as special
 import pymc as pm
 import pytensor as theano
 import pytensor.tensor as tt
-from .constants import const_G_Msun_kpc, cgsG
+
+from .constants import const_G_Msun_kpc
 
 
 class ArcTan(tt.Op):

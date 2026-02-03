@@ -1,11 +1,11 @@
 import numpy as np
 import pymc as pm
 import time
+import matplotlib.pyplot as plt
 
-
-from .deproject import MyDeprojVol, calc_density_operator, list_params, calc_linear_operator, calc_sb_operator, list_params_density, y_prefactor
+from .deproject import MyDeprojVol, calc_density_operator, list_params, calc_linear_operator, calc_sb_operator, list_params_density
 from .plots import rads_more, get_coolfunc
-from .constants import cgskpc, cgsMpc, cgsG, cgsamu, kev2erg, Msun, const_G_Msun_kpc, year
+from .constants import cgskpc, cgsMpc, cgsG, cgsamu, kev2erg, Msun, const_G_Msun_kpc, year, y_prefactor
 
 
 __all__ = ['gnfw_pm', 'gnfw_np', 'der_lnP_np', 'kt_forw_from_samples', 'P_forw_from_samples', 'mass_forw_from_samples', 'prof_forw_hires',

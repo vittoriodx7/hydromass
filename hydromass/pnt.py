@@ -3,7 +3,7 @@ import os
 import numpy as np
 import pymc as pm
 
-from build.lib.hydromass import alpha_turb_np
+##from build.lib.hydromass import alpha_turb_np
 from .constants import kev2erg, cgsamu
 
 __all__ = ['r200m_from_params', 'alpha_turb_pm', 'alpha_turb_np', 'get_data_file_path', 'find_nearest', 'NPmodel']

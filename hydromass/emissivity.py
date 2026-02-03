@@ -1,6 +1,5 @@
 import os
 import  numpy as np
-import pymc as pm
 import matplotlib.pyplot as plt
 from scipy.interpolate import interp1d
 from scipy.optimize import minimize

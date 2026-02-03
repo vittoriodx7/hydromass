@@ -8,8 +8,8 @@ from scipy.special import gamma
 from tqdm import tqdm
 import pymc as pm
 
-from .deproject import calc_density_operator, calc_density_operator_pm, MyDeprojVol, y_prefactor, elongation_correction_np
-from .constants import cgsamu, cgskpc, Msun, const_G_Msun_kpc, kev2erg, year
+from .deproject import calc_density_operator, calc_density_operator_pm, MyDeprojVol, elongation_correction_np
+from .constants import cgsamu, cgskpc, Msun, const_G_Msun_kpc, kev2erg, year, y_prefactor
 from .wl import get_radplus, rho_to_sigma_np, dsigma_trap_np, get_shear
 from .pnt import get_data_file_path, alpha_turb_np
 

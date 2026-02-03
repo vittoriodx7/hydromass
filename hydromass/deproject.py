@@ -1,8 +1,5 @@
 import numpy as np
 from scipy.special import gamma
-from .constants import *
-from astropy.io import fits
-import time
 import pymc as pm
 import sys
 

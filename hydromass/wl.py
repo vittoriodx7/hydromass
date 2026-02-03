@@ -4,7 +4,8 @@ from astropy import constants as const
 from astropy import units as u
 import random 
 from tqdm import tqdm
-from .deproject import *
+
+from .deproject import MyDeprojVol
 
 __all__ = ['rho_to_sigma', 'rho_to_sigma_np', 'dsigma_trap', 'dsigma_trap_np', 'get_shear', 'get_radplus', 'WLmodel', 'WLmodel_profiles_np',
            'sigbar_envelope_hires', 'get_einstein_r']
