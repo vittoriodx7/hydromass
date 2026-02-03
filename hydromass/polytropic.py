@@ -1,8 +1,10 @@
 import numpy as np
 import pymc as pm
+import time
 
-from .constants import cgskpc, cgsG, kev2erg, Msun, cgsamu
-from .deproject import MyDeprojVol
+from .constants import cgskpc, cgsG, kev2erg, Msun, cgsamu, year, cgsMpc
+from .deproject import (MyDeprojVol, list_params, calc_linear_operator, calc_sb_operator_psf, list_params_density, calc_density_operator,
+                        calc_grad_operator, calc_sb_operator)
 from .plots import rads_more, get_coolfunc, plt
 from .functions import ArcTan
 
