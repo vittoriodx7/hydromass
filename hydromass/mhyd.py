@@ -426,8 +426,8 @@ def Run_Mhyd_PyMC3(Mhyd,model,bkglim=None,nmcmc=1000,fit_bkg=False,back=None,
                 err_P0_est = P0_est # 1 in ln
 
             logp0 = pm.TruncatedNormal('logp0', mu=np.log(P0_est), sigma=err_P0_est / P0_est,
-                                       lower=np.log(P0_est) - err_P0_est / P0_est,
-                                       upper=np.log(P0_est) + err_P0_est / P0_est)
+                                       lower=np.log(P0_est) - np.log(10),
+                                       upper=np.log(P0_est) + np.log(10))
 
             if pnt :
 
@@ -988,10 +988,12 @@ class Mhyd:
     :type cosmo: class:`astropy.cosmology`
     :param abund: Solar abundance table. Available are 'angr' (Anders & Grevesse 1987), 'aspl' (Asplund et al. 2009), and 'grsa' (Grevesse & Sauval 2005). Defaults to 'aspl'
     :type abund: str
+    :param max_rad: Maximum radius out where cluster model is considered. Default 4000 kpc
+    :type max_rad: float
     """
 
     def __init__(self, sbprofile=None, spec_data=None, sz_data=None, wl_data=None, vel_data=None, directory=None, redshift=None, cosmo=None,
-                 abund = 'aspl', Zs=0.3):
+                 abund = 'aspl', Zs=0.3, max_rad=4000):
 
         file_abund = get_data_file_path('abundances.dat')
 
@@ -1070,6 +1072,7 @@ class Mhyd:
 
         self.abund = abund
 
+        self.max_rad = max_rad
 
     def emissivity(self, nh, rmf, type='single', kt=None, Z=0.3, elow=0.5, ehigh=2.0,
                    arf=None, unit='cr', lum_elow=0.5, lum_ehigh=2.0, outz=None, method='interp',
