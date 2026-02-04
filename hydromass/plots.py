@@ -164,20 +164,14 @@ def rads_more(Mhyd, nmore=5, extend=False):
     # Move the outer boundary to the edge of the SB profile if it is farther out
     sbprof = Mhyd.sbprof
 
-    rmax_sb = max(Mhyd.max_rad, np.max(sbprof.bins) * Mhyd.amin2kpc)
-
-    if rmax_sb > Mhyd.max_rad:
-
-        Mhyd.max_rad = rmax_sb
-
-    if rmax_sb > np.max(rout_more):
+    if Mhyd.max_rad > np.max(rout_more):
         nvm = len(rout_more)
 
         dx_out = rout_more[nvm - 1] - rout_more[nvm - 2]
 
-        rout_2add = np.arange(np.max(rout_more), rmax_sb, dx_out)
+        rout_2add = np.arange(np.max(rout_more), Mhyd.max_rad, dx_out)
 
-        rout_2add = np.append(rout_2add[1:], rmax_sb)
+        rout_2add = np.append(rout_2add[1:], Mhyd.max_rad)
 
         rout_more = np.append(rout_more, rout_2add)
 
@@ -350,22 +344,8 @@ def estimate_P0(Mhyd, dens='sb', outfile=None):
 
     res = minimize(chi2_gnfw, np.array([-4, 1200.]), method='Nelder-Mead', bounds=bnds)
 
-    maxrad = np.max(sbprof.bins * Mhyd.amin2kpc)
-
-    if Mhyd.sz_data is not None:
-
-        rmaxsz = np.max(Mhyd.sz_data.rout_sz)
-
-        if rmaxsz > maxrad:
-
-            maxrad = rmaxsz
-
     pars_press[0] = 10 ** res['x'][0]
     pars_press[1] = res['x'][1]
-
-    if maxrad > Mhyd.max_rad:
-
-        Mhyd.max_rad = maxrad
 
     p0 = gnfw_p0(Mhyd.max_rad, pars_press)
 
@@ -395,13 +375,13 @@ def estimate_P0(Mhyd, dens='sb', outfile=None):
 
         plt.errorbar(spec_data.rref_x, p_interp, yerr=ep_interp, fmt='o', markersize=10, label='P data')
 
-        xp = np.logspace(np.min(spec_data.rref_x), maxrad, 100)
+        xp = np.logspace(np.min(spec_data.rref_x), Mhyd.max_rad, 100)
 
         yp = gnfw_p0(xp, pars_press)
 
         plt.plot(xp, yp, label='P model')
 
-        plt.plot(maxrad, p0, 's', markersize=20, label='P0')
+        plt.plot(Mhyd.max_rad, p0, 's', markersize=20, label='P0')
 
         plt.savefig(outfile)
 

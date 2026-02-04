@@ -4,11 +4,8 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="5521cb6d-2b2a-4738-9850-2cb9dfed795b" name="Changes" comment="proxies_forward to __all__">
-      <change beforePath="$PROJECT_DIR$/.idea/hydromass.iml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/hydromass.iml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/misc.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/misc.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/hydromass/mhyd.py" beforeDir="false" afterPath="$PROJECT_DIR$/hydromass/mhyd.py" afterDir="false" />
+    <list default="true" id="5521cb6d-2b2a-4738-9850-2cb9dfed795b" name="Changes" comment="Determine max_rad including maximum of data">
+      <change beforePath="$PROJECT_DIR$/hydromass/plots.py" beforeDir="false" afterPath="$PROJECT_DIR$/hydromass/plots.py" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -198,7 +195,15 @@
       <option name="project" value="LOCAL" />
       <updated>1770132094000</updated>
     </task>
-    <option name="localTasksCounter" value="17" />
+    <task id="LOCAL-00017" summary="Determine max_rad including maximum of data">
+      <option name="closed" value="true" />
+      <created>1770201993669</created>
+      <option name="number" value="00017" />
+      <option name="presentableId" value="LOCAL-00017" />
+      <option name="project" value="LOCAL" />
+      <updated>1770201993669</updated>
+    </task>
+    <option name="localTasksCounter" value="18" />
     <servers />
   </component>
   <component name="Vcs.Log.Tabs.Properties">
@@ -222,6 +227,7 @@
     <MESSAGE value="Fixed bug in save.py" />
     <MESSAGE value="Estimated P0 value can change by exactly one order of magnitude&#10;&#10;Added max_rad to Mhyd. It will be used in the construction of the physical cluster model, e.g. going to 4 Mpc" />
     <MESSAGE value="proxies_forward to __all__" />
-    <option name="LAST_COMMIT_MESSAGE" value="proxies_forward to __all__" />
+    <MESSAGE value="Determine max_rad including maximum of data" />
+    <option name="LAST_COMMIT_MESSAGE" value="Determine max_rad including maximum of data" />
   </component>
 </project>
