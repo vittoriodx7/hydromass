@@ -1037,9 +1037,7 @@ class Mhyd:
 
         self.cosmo = cosmo
 
-        dlum = cosmo.luminosity_distance(redshift)
-
-        self.dlum = np.asarray(dlum, dtype=float)
+        self.dlum = float(cosmo.luminosity_distance(redshift).value)
 
         print('Luminosity distance to the source: %g Mpc' % (self.dlum))
 
