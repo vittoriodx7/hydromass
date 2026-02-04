@@ -4,471 +4,201 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-<<<<<<< HEAD
-<<<<<<< HEAD
-    <list default="true" id="2e6b3625-bcc2-4100-8503-a605a49d6e1d" name="Default Changelist" comment="Created pymc4 (a.k.a pymc)-compatible version" />
-=======
-    <list default="true" id="2e6b3625-bcc2-4100-8503-a605a49d6e1d" name="Default Changelist" comment="Changed exponential from numpy to theano">
-=======
-    <list default="true" id="2e6b3625-bcc2-4100-8503-a605a49d6e1d" name="Default Changelist" comment="fixed bug in elongation">
->>>>>>> 57619a5e9c71471bc5d7a57c371dd3559640cb3c
+    <list default="true" id="5521cb6d-2b2a-4738-9850-2cb9dfed795b" name="Changes" comment="proxies_forward to __all__">
+      <change beforePath="$PROJECT_DIR$/.idea/hydromass.iml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/hydromass.iml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/misc.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/misc.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/hydromass/mhyd.py" beforeDir="false" afterPath="$PROJECT_DIR$/hydromass/mhyd.py" afterDir="false" />
     </list>
->>>>>>> 36f920ad050d7b520dd35f4f78699183eae59e5b
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
     <option name="HIGHLIGHT_NON_ACTIVE_CHANGELIST" value="false" />
     <option name="LAST_RESOLUTION" value="IGNORE" />
   </component>
-  <component name="Git.Rebase.Settings">
-    <option name="NEW_BASE" value="pymc4" />
-  </component>
   <component name="Git.Settings">
-    <option name="RECENT_BRANCH_BY_REPOSITORY">
-      <map>
-        <entry key="$PROJECT_DIR$" value="master" />
-      </map>
-    </option>
+    <branch-grouping />
     <option name="RECENT_GIT_ROOT_PATH" value="$PROJECT_DIR$" />
   </component>
-  <component name="GitSEFilterConfiguration">
-    <file-type-list>
-      <filtered-out-file-type name="LOCAL_BRANCH" />
-      <filtered-out-file-type name="REMOTE_BRANCH" />
-      <filtered-out-file-type name="TAG" />
-      <filtered-out-file-type name="COMMIT_BY_MESSAGE" />
-    </file-type-list>
+  <component name="ProblemsViewState">
+    <hideBySeverity>
+      <option value="11" />
+      <option value="14" />
+      <option value="15" />
+      <option value="16" />
+      <option value="100" />
+      <option value="200" />
+    </hideBySeverity>
+    <option name="selectedTabId" value="CurrentFile" />
   </component>
-  <component name="MarkdownSettingsMigration">
-    <option name="stateVersion" value="1" />
-  </component>
-  <component name="ProjectId" id="1hgAphKf3qQevm5AFfGvkJ0OmNX" />
-  <component name="ProjectLevelVcsManager" settingsEditedManually="true" />
+  <component name="ProjectColorInfo">{
+  &quot;customColor&quot;: &quot;&quot;,
+  &quot;associatedIndex&quot;: 4
+}</component>
+  <component name="ProjectId" id="38y7PONjK0tnslg7kzfF7jclVWh" />
   <component name="ProjectViewState">
     <option name="hideEmptyMiddlePackages" value="true" />
     <option name="showLibraryContents" value="true" />
+    <option name="showMembers" value="true" />
   </component>
-  <component name="PropertiesComponent">
-    <property name="RunOnceActivity.OpenProjectViewOnStart" value="true" />
-    <property name="RunOnceActivity.ShowReadmeOnStart" value="true" />
-    <property name="SHARE_PROJECT_CONFIGURATION_FILES" value="true" />
-    <property name="last_opened_file_path" value="$PROJECT_DIR$/hydromass/delta.py" />
-    <property name="run.code.analysis.last.selected.profile" value="pProject Default" />
-    <property name="settings.editor.selected.configurable" value="reference.settingsdialog.IDE.editor.colors" />
-    <property name="two.files.diff.last.used.file" value="$PROJECT_DIR$/hydromass/delta.py" />
+  <component name="PropertiesComponent"><![CDATA[{
+  "keyToString": {
+    "RunOnceActivity.ShowReadmeOnStart": "true",
+    "RunOnceActivity.TerminalTabsStorage.copyFrom.TerminalArrangementManager.252": "true",
+    "RunOnceActivity.git.unshallow": "true",
+    "git-widget-placeholder": "master",
+    "last_opened_file_path": "/home/vittorio/PycharmProjects/hydromass",
+    "settings.editor.selected.configurable": "com.jetbrains.python.configuration.PyActiveSdkModuleConfigurable"
+  }
+}]]></component>
+  <component name="RecentsManager">
+    <key name="CopyFile.RECENT_KEYS">
+      <recent name="$PROJECT_DIR$" />
+    </key>
   </component>
-  <component name="RunManager">
-    <configuration name="delta" type="PythonConfigurationType" factoryName="Python" temporary="true" nameIsGenerated="true">
-      <module name="hydromass" />
-      <option name="INTERPRETER_OPTIONS" value="" />
-      <option name="PARENT_ENVS" value="true" />
-      <envs>
-        <env name="PYTHONUNBUFFERED" value="1" />
-      </envs>
-      <option name="SDK_HOME" value="" />
-      <option name="WORKING_DIRECTORY" value="$PROJECT_DIR$/hydromass" />
-      <option name="IS_MODULE_SDK" value="true" />
-      <option name="ADD_CONTENT_ROOTS" value="true" />
-      <option name="ADD_SOURCE_ROOTS" value="true" />
-      <option name="SCRIPT_NAME" value="$PROJECT_DIR$/hydromass/delta.py" />
-      <option name="PARAMETERS" value="" />
-      <option name="SHOW_COMMAND_LINE" value="false" />
-      <option name="EMULATE_TERMINAL" value="false" />
-      <option name="MODULE_MODE" value="false" />
-      <option name="REDIRECT_INPUT" value="false" />
-      <option name="INPUT_FILE" value="" />
-      <method v="2" />
-    </configuration>
-    <recent_temporary>
-      <list>
-        <item itemvalue="Python.delta" />
-      </list>
-    </recent_temporary>
-  </component>
-  <component name="SpellCheckerSettings" RuntimeDictionaries="0" Folders="0" CustomDictionaries="0" DefaultDictionary="application-level" UseSingleDictionary="true" transferred="true" />
-  <component name="SvnConfiguration">
-    <configuration />
+  <component name="SharedIndexes">
+    <attachedChunks>
+      <set>
+        <option value="bundled-python-sdk-3944b0c99280-6d6dccd035ac-com.jetbrains.pycharm.pro.sharedIndexes.bundled-PY-253.30387.127" />
+      </set>
+    </attachedChunks>
   </component>
   <component name="TaskManager">
     <task active="true" id="Default" summary="Default task">
-      <changelist id="2e6b3625-bcc2-4100-8503-a605a49d6e1d" name="Default Changelist" comment="" />
-      <created>1590752040766</created>
+      <changelist id="5521cb6d-2b2a-4738-9850-2cb9dfed795b" name="Changes" comment="" />
+      <created>1769759932248</created>
       <option name="number" value="Default" />
       <option name="presentableId" value="Default" />
-      <updated>1590752040766</updated>
+      <updated>1769759932248</updated>
     </task>
-<<<<<<< HEAD
-    <task id="LOCAL-00038" summary="Tuned NUTS sampling parameters">
-      <created>1622530863632</created>
-      <option name="number" value="00038" />
-      <option name="presentableId" value="LOCAL-00038" />
+    <task id="LOCAL-00001" summary="Added computation of baryon and total acceleration for the forward model">
+      <option name="closed" value="true" />
+      <created>1770029648048</created>
+      <option name="number" value="00001" />
+      <option name="presentableId" value="LOCAL-00001" />
       <option name="project" value="LOCAL" />
-      <updated>1622530863632</updated>
+      <updated>1770029648048</updated>
     </task>
-    <task id="LOCAL-00039" summary="Improved numerical integration">
-      <created>1629363860369</created>
-      <option name="number" value="00039" />
-      <option name="presentableId" value="LOCAL-00039" />
+    <task id="LOCAL-00002" summary="Saving and loading the trace as well. Useful for model comparison when not run at the same time.">
+      <option name="closed" value="true" />
+      <created>1770029678257</created>
+      <option name="number" value="00002" />
+      <option name="presentableId" value="LOCAL-00002" />
       <option name="project" value="LOCAL" />
-      <updated>1629363860369</updated>
+      <updated>1770029678257</updated>
     </task>
-=======
->>>>>>> 57619a5e9c71471bc5d7a57c371dd3559640cb3c
-    <task id="LOCAL-00040" summary="Added options to choose the range and number of points when computing hires profiles">
-      <created>1629449252972</created>
-      <option name="number" value="00040" />
-      <option name="presentableId" value="LOCAL-00040" />
+    <task id="LOCAL-00003" summary="Added __all__">
+      <option name="closed" value="true" />
+      <created>1770029866517</created>
+      <option name="number" value="00003" />
+      <option name="presentableId" value="LOCAL-00003" />
       <option name="project" value="LOCAL" />
-      <updated>1629449252972</updated>
+      <updated>1770029866517</updated>
     </task>
-    <task id="LOCAL-00041" summary="Added extrapolation to outer radius of the surface brightness using a power law to avoid issues at the outer boundary">
-      <created>1629982821872</created>
-      <option name="number" value="00041" />
-      <option name="presentableId" value="LOCAL-00041" />
+    <task id="LOCAL-00004" summary="Added __all__">
+      <option name="closed" value="true" />
+      <created>1770030890785</created>
+      <option name="number" value="00004" />
+      <option name="presentableId" value="LOCAL-00004" />
       <option name="project" value="LOCAL" />
-      <updated>1629982821872</updated>
+      <updated>1770030890785</updated>
     </task>
-    <task id="LOCAL-00042" summary="P0 is now evaluated at the outer boundary of the surface brightness profile if it is larger than the outer boundary of the spectral/SZ profiles">
-      <created>1629982875198</created>
-      <option name="number" value="00042" />
-      <option name="presentableId" value="LOCAL-00042" />
+    <task id="LOCAL-00005" summary="Added rmax_sb of 4 Mpc">
+      <option name="closed" value="true" />
+      <created>1770117359063</created>
+      <option name="number" value="00005" />
+      <option name="presentableId" value="LOCAL-00005" />
       <option name="project" value="LOCAL" />
-      <updated>1629982875198</updated>
+      <updated>1770117359064</updated>
     </task>
-    <task id="LOCAL-00043" summary="Added new function to estimate P0 by fitting a rough gNFW profile to the spectral data">
-      <created>1629982928300</created>
-      <option name="number" value="00043" />
-      <option name="presentableId" value="LOCAL-00043" />
+    <task id="LOCAL-00006" summary="Fixed imports">
+      <option name="closed" value="true" />
+      <created>1770118966523</created>
+      <option name="number" value="00006" />
+      <option name="presentableId" value="LOCAL-00006" />
       <option name="project" value="LOCAL" />
-      <updated>1629982928300</updated>
+      <updated>1770118966523</updated>
     </task>
-    <task id="LOCAL-00044" summary="Fixed overflow issue in onion peeling">
-      <created>1629982953059</created>
-      <option name="number" value="00044" />
-      <option name="presentableId" value="LOCAL-00044" />
+    <task id="LOCAL-00007" summary="Fixed imports">
+      <option name="closed" value="true" />
+      <created>1770119385194</created>
+      <option name="number" value="00007" />
+      <option name="presentableId" value="LOCAL-00007" />
       <option name="project" value="LOCAL" />
-      <updated>1629982953059</updated>
+      <updated>1770119385194</updated>
     </task>
-    <task id="LOCAL-00045" summary="Updated call to rads_more">
-      <created>1629982970855</created>
-      <option name="number" value="00045" />
-      <option name="presentableId" value="LOCAL-00045" />
+    <task id="LOCAL-00008" summary="Fixed imports">
+      <option name="closed" value="true" />
+      <created>1770121213500</created>
+      <option name="number" value="00008" />
+      <option name="presentableId" value="LOCAL-00008" />
       <option name="project" value="LOCAL" />
-      <updated>1629982970855</updated>
+      <updated>1770121213500</updated>
     </task>
-    <task id="LOCAL-00046" summary="Fixed call to psfmat when no matrix has been defined">
-      <created>1629985758661</created>
-      <option name="number" value="00046" />
-      <option name="presentableId" value="LOCAL-00046" />
+    <task id="LOCAL-00009" summary="Fixed imports">
+      <option name="closed" value="true" />
+      <created>1770121217074</created>
+      <option name="number" value="00009" />
+      <option name="presentableId" value="LOCAL-00009" />
       <option name="project" value="LOCAL" />
-      <updated>1629985758661</updated>
+      <updated>1770121217074</updated>
     </task>
-    <task id="LOCAL-00047" summary="Switched radius at which the density is evaluated from rref to rout">
-      <created>1629986046107</created>
-      <option name="number" value="00047" />
-      <option name="presentableId" value="LOCAL-00047" />
+    <task id="LOCAL-00010" summary="Fixed imports">
+      <option name="closed" value="true" />
+      <created>1770122746815</created>
+      <option name="number" value="00010" />
+      <option name="presentableId" value="LOCAL-00010" />
       <option name="project" value="LOCAL" />
-      <updated>1629986046107</updated>
+      <updated>1770122746815</updated>
     </task>
-    <task id="LOCAL-00048" summary="Replaced linear Gaussian process with log-normal process">
-      <created>1630483537217</created>
-      <option name="number" value="00048" />
-      <option name="presentableId" value="LOCAL-00048" />
+    <task id="LOCAL-00011" summary="Fixed bug in forward.py">
+      <option name="closed" value="true" />
+      <created>1770125600655</created>
+      <option name="number" value="00011" />
+      <option name="presentableId" value="LOCAL-00011" />
       <option name="project" value="LOCAL" />
-      <updated>1630483537218</updated>
+      <updated>1770125600655</updated>
     </task>
-    <task id="LOCAL-00049" summary="Fixed issue in GP mass reconstruction">
-      <created>1630570659171</created>
-      <option name="number" value="00049" />
-      <option name="presentableId" value="LOCAL-00049" />
+    <task id="LOCAL-00012" summary="Fixed bug in save.py">
+      <option name="closed" value="true" />
+      <created>1770125696358</created>
+      <option name="number" value="00012" />
+      <option name="presentableId" value="LOCAL-00012" />
       <option name="project" value="LOCAL" />
-      <updated>1630570659172</updated>
+      <updated>1770125696358</updated>
     </task>
-    <task id="LOCAL-00050" summary="Tuned lognormal GP parameters">
-      <created>1631527428848</created>
-      <option name="number" value="00050" />
-      <option name="presentableId" value="LOCAL-00050" />
+    <task id="LOCAL-00013" summary="Fixed bug in save.py">
+      <option name="closed" value="true" />
+      <created>1770125713316</created>
+      <option name="number" value="00013" />
+      <option name="presentableId" value="LOCAL-00013" />
       <option name="project" value="LOCAL" />
-      <updated>1631527428849</updated>
+      <updated>1770125713316</updated>
     </task>
-    <task id="LOCAL-00051" summary="Added computation of WAIC and LOO as well as log-likelihood values">
-      <created>1638970210952</created>
-      <option name="number" value="00051" />
-      <option name="presentableId" value="LOCAL-00051" />
+    <task id="LOCAL-00014" summary="Estimated P0 value can change by exactly one order of magnitude&#10;&#10;Added max_rad to Mhyd. It will be used in the construction of the physical cluster model, e.g. going to 4 Mpc">
+      <option name="closed" value="true" />
+      <created>1770129458235</created>
+      <option name="number" value="00014" />
+      <option name="presentableId" value="LOCAL-00014" />
       <option name="project" value="LOCAL" />
-      <updated>1638970210953</updated>
+      <updated>1770129458235</updated>
     </task>
-    <task id="LOCAL-00052" summary="Updated plot boundaries">
-      <created>1638970903141</created>
-      <option name="number" value="00052" />
-      <option name="presentableId" value="LOCAL-00052" />
+    <task id="LOCAL-00015" summary="Estimated P0 value can change by exactly one order of magnitude&#10;&#10;Added max_rad to Mhyd. It will be used in the construction of the physical cluster model, e.g. going to 4 Mpc">
+      <option name="closed" value="true" />
+      <created>1770131776822</created>
+      <option name="number" value="00015" />
+      <option name="presentableId" value="LOCAL-00015" />
       <option name="project" value="LOCAL" />
-      <updated>1638970903141</updated>
+      <updated>1770131776822</updated>
     </task>
-    <task id="LOCAL-00053" summary="New Mac">
-      <created>1642326918039</created>
-      <option name="number" value="00053" />
-      <option name="presentableId" value="LOCAL-00053" />
+    <task id="LOCAL-00016" summary="proxies_forward to __all__">
+      <option name="closed" value="true" />
+      <created>1770132094000</created>
+      <option name="number" value="00016" />
+      <option name="presentableId" value="LOCAL-00016" />
       <option name="project" value="LOCAL" />
-      <updated>1642326918039</updated>
+      <updated>1770132094000</updated>
     </task>
-    <task id="LOCAL-00054" summary="Updated pymc3 sampling to &quot;return_inferencedata=True&quot;">
-      <created>1642328489704</created>
-      <option name="number" value="00054" />
-      <option name="presentableId" value="LOCAL-00054" />
-      <option name="project" value="LOCAL" />
-      <updated>1642328489704</updated>
-    </task>
-    <task id="LOCAL-00055" summary="Added lots of docstrings">
-      <created>1645633235998</created>
-      <option name="number" value="00055" />
-      <option name="presentableId" value="LOCAL-00055" />
-      <option name="project" value="LOCAL" />
-      <updated>1645633235998</updated>
-    </task>
-    <task id="LOCAL-00056" summary="Added requirements.txt">
-      <created>1645633738786</created>
-      <option name="number" value="00056" />
-      <option name="presentableId" value="LOCAL-00056" />
-      <option name="project" value="LOCAL" />
-      <updated>1645633738786</updated>
-    </task>
-    <task id="LOCAL-00057" summary="Removed build">
-      <created>1645634115675</created>
-      <option name="number" value="00057" />
-      <option name="presentableId" value="LOCAL-00057" />
-      <option name="project" value="LOCAL" />
-      <updated>1645634115675</updated>
-    </task>
-    <task id="LOCAL-00058" summary="Removed .readthedocs.yml">
-      <created>1645634668832</created>
-      <option name="number" value="00058" />
-      <option name="presentableId" value="LOCAL-00058" />
-      <option name="project" value="LOCAL" />
-      <updated>1645634668832</updated>
-    </task>
-    <task id="LOCAL-00059" summary="Removed .readthedocs.yml">
-      <created>1645635321295</created>
-      <option name="number" value="00059" />
-      <option name="presentableId" value="LOCAL-00059" />
-      <option name="project" value="LOCAL" />
-      <updated>1645635321295</updated>
-    </task>
-    <task id="LOCAL-00060" summary="Added first tutorial">
-      <created>1645718270077</created>
-      <option name="number" value="00060" />
-      <option name="presentableId" value="LOCAL-00060" />
-      <option name="project" value="LOCAL" />
-      <updated>1645718270077</updated>
-    </task>
-    <task id="LOCAL-00061" summary="Added first tutorial">
-      <created>1645720371541</created>
-      <option name="number" value="00061" />
-      <option name="presentableId" value="LOCAL-00061" />
-      <option name="project" value="LOCAL" />
-      <updated>1645720371541</updated>
-    </task>
-    <task id="LOCAL-00062" summary="better name">
-      <created>1645720589943</created>
-      <option name="number" value="00062" />
-      <option name="presentableId" value="LOCAL-00062" />
-      <option name="project" value="LOCAL" />
-      <updated>1645720589943</updated>
-    </task>
-    <task id="LOCAL-00063" summary="Added tutorial on non-parametric mass reconstruction">
-      <created>1645880943890</created>
-      <option name="number" value="00063" />
-      <option name="presentableId" value="LOCAL-00063" />
-      <option name="project" value="LOCAL" />
-      <updated>1645880943890</updated>
-    </task>
-    <task id="LOCAL-00064" summary="Added tutorial on non-parametric mass reconstruction">
-      <created>1645881305564</created>
-      <option name="number" value="00064" />
-      <option name="presentableId" value="LOCAL-00064" />
-      <option name="project" value="LOCAL" />
-      <updated>1645881305564</updated>
-    </task>
-    <task id="LOCAL-00065" summary="Added last docstring">
-      <created>1645946935989</created>
-      <option name="number" value="00065" />
-      <option name="presentableId" value="LOCAL-00065" />
-      <option name="project" value="LOCAL" />
-      <updated>1645946935989</updated>
-    </task>
-    <task id="LOCAL-00066" summary="removed unnecessary directories">
-      <created>1645947019260</created>
-      <option name="number" value="00066" />
-      <option name="presentableId" value="LOCAL-00066" />
-      <option name="project" value="LOCAL" />
-      <updated>1645947019260</updated>
-    </task>
-    <task id="LOCAL-00067" summary="removed unnecessary directories">
-      <created>1646036966056</created>
-      <option name="number" value="00067" />
-      <option name="presentableId" value="LOCAL-00067" />
-      <option name="project" value="LOCAL" />
-      <updated>1646036966056</updated>
-    </task>
-    <task id="LOCAL-00068" summary="removed unnecessary directories">
-      <created>1646037625194</created>
-      <option name="number" value="00068" />
-      <option name="presentableId" value="LOCAL-00068" />
-      <option name="project" value="LOCAL" />
-      <updated>1646037625194</updated>
-    </task>
-    <task id="LOCAL-00069" summary="removed unnecessary directories">
-      <created>1646210918328</created>
-      <option name="number" value="00069" />
-      <option name="presentableId" value="LOCAL-00069" />
-      <option name="project" value="LOCAL" />
-      <updated>1646210918332</updated>
-    </task>
-    <task id="LOCAL-00070" summary="Added Parametric tutorial">
-      <created>1646210957382</created>
-      <option name="number" value="00070" />
-      <option name="presentableId" value="LOCAL-00070" />
-      <option name="project" value="LOCAL" />
-      <updated>1646210957382</updated>
-    </task>
-    <task id="LOCAL-00071" summary="Added Parametric tutorial">
-      <created>1646214262432</created>
-      <option name="number" value="00071" />
-      <option name="presentableId" value="LOCAL-00071" />
-      <option name="project" value="LOCAL" />
-      <updated>1646214262432</updated>
-    </task>
-    <task id="LOCAL-00072" summary="Added Parametric tutorial">
-      <created>1646226863602</created>
-      <option name="number" value="00072" />
-      <option name="presentableId" value="LOCAL-00072" />
-      <option name="project" value="LOCAL" />
-      <updated>1646226863602</updated>
-    </task>
-    <task id="LOCAL-00073" summary="Added Parametric tutorial">
-      <created>1646229184363</created>
-      <option name="number" value="00073" />
-      <option name="presentableId" value="LOCAL-00073" />
-      <option name="project" value="LOCAL" />
-      <updated>1646229184363</updated>
-    </task>
-    <task id="LOCAL-00074" summary="Updated setup.py">
-      <created>1646231146174</created>
-      <option name="number" value="00074" />
-      <option name="presentableId" value="LOCAL-00074" />
-      <option name="project" value="LOCAL" />
-      <updated>1646231146174</updated>
-    </task>
-    <task id="LOCAL-00075" summary="Uploaded project to PyPI and wrote installation instructions">
-      <created>1646306864508</created>
-      <option name="number" value="00075" />
-      <option name="presentableId" value="LOCAL-00075" />
-      <option name="project" value="LOCAL" />
-      <updated>1646306864508</updated>
-    </task>
-    <task id="LOCAL-00076" summary="Uploaded project to PyPI and wrote installation instructions">
-      <created>1646387294627</created>
-      <option name="number" value="00076" />
-      <option name="presentableId" value="LOCAL-00076" />
-      <option name="project" value="LOCAL" />
-      <updated>1646387294627</updated>
-    </task>
-    <task id="LOCAL-00077" summary="Added contour plots">
-      <created>1653038631530</created>
-      <option name="number" value="00077" />
-      <option name="presentableId" value="LOCAL-00077" />
-      <option name="project" value="LOCAL" />
-      <updated>1653038631530</updated>
-    </task>
-    <task id="LOCAL-00078" summary="Fix issue with extraction of posterior profiles when using a variable emissivity conversion factor">
-      <created>1653038687934</created>
-      <option name="number" value="00078" />
-      <option name="presentableId" value="LOCAL-00078" />
-      <option name="project" value="LOCAL" />
-      <updated>1653038687934</updated>
-    </task>
-    <task id="LOCAL-00079" summary="Fixed issue when using a variable CCF">
-      <created>1653069347283</created>
-      <option name="number" value="00079" />
-      <option name="presentableId" value="LOCAL-00079" />
-      <option name="project" value="LOCAL" />
-      <updated>1653069347283</updated>
-    </task>
-    <task id="LOCAL-00080" summary="Added option to automatically compute a CCF profile">
-      <created>1653069365814</created>
-      <option name="number" value="00080" />
-      <option name="presentableId" value="LOCAL-00080" />
-      <option name="project" value="LOCAL" />
-      <updated>1653069365814</updated>
-    </task>
-    <task id="LOCAL-00081" summary="Fixed delta calculation in Forward">
-      <created>1653547498197</created>
-      <option name="number" value="00081" />
-      <option name="presentableId" value="LOCAL-00081" />
-      <option name="project" value="LOCAL" />
-      <updated>1653547498197</updated>
-    </task>
-    <task id="LOCAL-00082" summary="Added option to estimate the prior on P0 from the fitted spectral normalization rather than from the surface brightness profile">
-      <created>1654262764466</created>
-      <option name="number" value="00082" />
-      <option name="presentableId" value="LOCAL-00082" />
-      <option name="project" value="LOCAL" />
-      <updated>1654262764466</updated>
-    </task>
-    <task id="LOCAL-00083" summary="In the case of a variable conversion factor, added option to fit the input temperature profile with a Vikhlinin-like function and use the fitted function instead of interpolating">
-      <created>1661176262853</created>
-      <option name="number" value="00083" />
-      <option name="presentableId" value="LOCAL-00083" />
-      <option name="project" value="LOCAL" />
-      <updated>1661176262853</updated>
-    </task>
-    <task id="LOCAL-00084" summary="Changed exponential from numpy to theano">
-      <created>1661176296238</created>
-      <option name="number" value="00084" />
-      <option name="presentableId" value="LOCAL-00084" />
-      <option name="project" value="LOCAL" />
-      <updated>1661176296238</updated>
-    </task>
-    <task id="LOCAL-00085" summary="Increase version number and uploaded to PyPI">
-      <created>1661176467399</created>
-      <option name="number" value="00085" />
-      <option name="presentableId" value="LOCAL-00085" />
-      <option name="project" value="LOCAL" />
-      <updated>1661176467399</updated>
-    </task>
-<<<<<<< HEAD
-    <task id="LOCAL-00086" summary="Created pymc4 (a.k.a pymc)-compatible version">
-      <created>1668674530213</created>
-      <option name="number" value="00086" />
-      <option name="presentableId" value="LOCAL-00086" />
-      <option name="project" value="LOCAL" />
-      <updated>1668674530213</updated>
-    </task>
-    <option name="localTasksCounter" value="87" />
-=======
-    <task id="LOCAL-00086" summary="Added WL module">
-      <created>1679555317306</created>
-      <option name="number" value="00086" />
-      <option name="presentableId" value="LOCAL-00086" />
-      <option name="project" value="LOCAL" />
-      <updated>1679555317306</updated>
-    </task>
-    <task id="LOCAL-00087" summary="fixed imports">
-      <created>1679555664024</created>
-      <option name="number" value="00087" />
-      <option name="presentableId" value="LOCAL-00087" />
-      <option name="project" value="LOCAL" />
-      <updated>1679555664024</updated>
-    </task>
-    <task id="LOCAL-00088" summary="fixed bug in elongation">
-      <created>1679567381492</created>
-      <option name="number" value="00088" />
-      <option name="presentableId" value="LOCAL-00088" />
-      <option name="project" value="LOCAL" />
-      <updated>1679567381492</updated>
-    </task>
-    <option name="localTasksCounter" value="89" />
->>>>>>> 57619a5e9c71471bc5d7a57c371dd3559640cb3c
+    <option name="localTasksCounter" value="17" />
     <servers />
   </component>
   <component name="Vcs.Log.Tabs.Properties">
@@ -483,46 +213,15 @@
     </option>
   </component>
   <component name="VcsManagerConfiguration">
-    <ignored-roots>
-      <path value="$PROJECT_DIR$/../.." />
-      <path value="$USER_HOME$/hydromass" />
-      <path value="$PROJECT_DIR$/.." />
-    </ignored-roots>
-<<<<<<< HEAD
-    <MESSAGE value="Updated plot boundaries" />
-    <MESSAGE value="New Mac" />
-=======
->>>>>>> 57619a5e9c71471bc5d7a57c371dd3559640cb3c
-    <MESSAGE value="Updated pymc3 sampling to &quot;return_inferencedata=True&quot;" />
-    <MESSAGE value="Added lots of docstrings" />
-    <MESSAGE value="Added requirements.txt" />
-    <MESSAGE value="Removed build" />
-    <MESSAGE value="Removed .readthedocs.yml" />
-    <MESSAGE value="Added first tutorial" />
-    <MESSAGE value="better name" />
-    <MESSAGE value="Added tutorial on non-parametric mass reconstruction" />
-    <MESSAGE value="Added last docstring" />
-    <MESSAGE value="removed unnecessary directories" />
-    <MESSAGE value="Added Parametric tutorial" />
-    <MESSAGE value="Updated setup.py" />
-    <MESSAGE value="Uploaded project to PyPI and wrote installation instructions" />
-    <MESSAGE value="Added contour plots" />
-    <MESSAGE value="Fix issue with extraction of posterior profiles when using a variable emissivity conversion factor" />
-    <MESSAGE value="Fixed issue when using a variable CCF" />
-    <MESSAGE value="Added option to automatically compute a CCF profile" />
-    <MESSAGE value="Fixed delta calculation in Forward" />
-    <MESSAGE value="Added option to estimate the prior on P0 from the fitted spectral normalization rather than from the surface brightness profile" />
-    <MESSAGE value="In the case of a variable conversion factor, added option to fit the input temperature profile with a Vikhlinin-like function and use the fitted function instead of interpolating" />
-    <MESSAGE value="Changed exponential from numpy to theano" />
-    <MESSAGE value="Increase version number and uploaded to PyPI" />
-<<<<<<< HEAD
-    <MESSAGE value="Created pymc4 (a.k.a pymc)-compatible version" />
-    <option name="LAST_COMMIT_MESSAGE" value="Created pymc4 (a.k.a pymc)-compatible version" />
-=======
-    <MESSAGE value="Added WL module" />
-    <MESSAGE value="fixed imports" />
-    <MESSAGE value="fixed bug in elongation" />
-    <option name="LAST_COMMIT_MESSAGE" value="fixed bug in elongation" />
->>>>>>> 57619a5e9c71471bc5d7a57c371dd3559640cb3c
+    <MESSAGE value="Added computation of baryon and total acceleration for the forward model" />
+    <MESSAGE value="Saving and loading the trace as well. Useful for model comparison when not run at the same time." />
+    <MESSAGE value="Added __all__" />
+    <MESSAGE value="Added rmax_sb of 4 Mpc" />
+    <MESSAGE value="Fixed imports" />
+    <MESSAGE value="Fixed bug in forward.py" />
+    <MESSAGE value="Fixed bug in save.py" />
+    <MESSAGE value="Estimated P0 value can change by exactly one order of magnitude&#10;&#10;Added max_rad to Mhyd. It will be used in the construction of the physical cluster model, e.g. going to 4 Mpc" />
+    <MESSAGE value="proxies_forward to __all__" />
+    <option name="LAST_COMMIT_MESSAGE" value="proxies_forward to __all__" />
   </component>
 </project>

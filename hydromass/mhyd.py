@@ -1075,7 +1075,21 @@ class Mhyd:
 
         self.abund = abund
 
-        self.max_rad = max_rad
+        rmax_sb, rmax_kt, rmax_sz = 0, 0, 0
+
+        if self.sbprof is not None:
+
+            rmax_sb = np.max(self.sbprof.bins * self.amin2kpc)
+
+        if self.spec_data is not None:
+
+            rmax_kt = np.max(self.spec_data.rref_x)
+
+        if self.sz_data is not None:
+
+            rmax_sz = np.max(self.sz_data.rref_sz)
+
+        self.max_rad = max(max_rad, rmax_sb, rmax_kt, rmax_sz)
 
     def emissivity(self, nh, rmf, type='single', kt=None, Z=0.3, elow=0.5, ehigh=2.0,
                    arf=None, unit='cr', lum_elow=0.5, lum_ehigh=2.0, outz=None, method='interp',
