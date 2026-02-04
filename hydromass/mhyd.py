@@ -429,7 +429,7 @@ def Run_Mhyd_PyMC3(Mhyd,model,bkglim=None,nmcmc=1000,fit_bkg=False,back=None,
                                        lower=np.log(P0_est) - np.log(10),
                                        upper=np.log(P0_est) + np.log(10))
 
-            print(f"logp0 = pm.TruncatedNormal('logp0', mu={np.log(P0_est)}, sigma={err_P0_est / P0_est}, "
+            print(f"pm.TruncatedNormal('logp0', mu={np.log(P0_est)}, sigma={err_P0_est / P0_est}, "
                   f"lower={np.log(P0_est) - np.log(10)}, upper={np.log(P0_est) + np.log(10)})")
 
             if pnt :
