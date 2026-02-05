@@ -4,9 +4,7 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="5521cb6d-2b2a-4738-9850-2cb9dfed795b" name="Changes" comment="Saving also:&#10;- 'ktmod', 'ktmod_lo', 'ktmod_hi', 'kt3d', 'kt3d_lo', 'kt3d_hi'&#10;- 'sb_dec', 'sb_dec_lo', 'sb_dec_hi', 'sb', 'sb_lo', 'sb_hi', 'dens', 'dens_lo', 'dens_hi'&#10;- 'pmod', 'pmod_lo', 'pmod_hi'&#10;- 'pars', 'pardens', 'K', 'Ksb', 'Kdens', 'Kdens_m'">
-      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/hydromass/mhyd.py" beforeDir="false" afterPath="$PROJECT_DIR$/hydromass/mhyd.py" afterDir="false" />
+    <list default="true" id="5521cb6d-2b2a-4738-9850-2cb9dfed795b" name="Changes" comment="Saving eta to the parameters when computed">
       <change beforePath="$PROJECT_DIR$/hydromass/save.py" beforeDir="false" afterPath="$PROJECT_DIR$/hydromass/save.py" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
@@ -292,7 +290,15 @@
       <option name="project" value="LOCAL" />
       <updated>1770291054432</updated>
     </task>
-    <option name="localTasksCounter" value="28" />
+    <task id="LOCAL-00028" summary="Saving eta to the parameters when computed">
+      <option name="closed" value="true" />
+      <created>1770294805508</created>
+      <option name="number" value="00028" />
+      <option name="presentableId" value="LOCAL-00028" />
+      <option name="project" value="LOCAL" />
+      <updated>1770294805508</updated>
+    </task>
+    <option name="localTasksCounter" value="29" />
     <servers />
   </component>
   <component name="Vcs.Log.Tabs.Properties">
@@ -321,6 +327,7 @@
     <MESSAGE value="from .nonparametric import * was missing" />
     <MESSAGE value="Common SB from sb_utils" />
     <MESSAGE value="Saving also:&#10;- 'ktmod', 'ktmod_lo', 'ktmod_hi', 'kt3d', 'kt3d_lo', 'kt3d_hi'&#10;- 'sb_dec', 'sb_dec_lo', 'sb_dec_hi', 'sb', 'sb_lo', 'sb_hi', 'dens', 'dens_lo', 'dens_hi'&#10;- 'pmod', 'pmod_lo', 'pmod_hi'&#10;- 'pars', 'pardens', 'K', 'Ksb', 'Kdens', 'Kdens_m'" />
-    <option name="LAST_COMMIT_MESSAGE" value="Saving also:&#10;- 'ktmod', 'ktmod_lo', 'ktmod_hi', 'kt3d', 'kt3d_lo', 'kt3d_hi'&#10;- 'sb_dec', 'sb_dec_lo', 'sb_dec_hi', 'sb', 'sb_lo', 'sb_hi', 'dens', 'dens_lo', 'dens_hi'&#10;- 'pmod', 'pmod_lo', 'pmod_hi'&#10;- 'pars', 'pardens', 'K', 'Ksb', 'Kdens', 'Kdens_m'" />
+    <MESSAGE value="Saving eta to the parameters when computed" />
+    <option name="LAST_COMMIT_MESSAGE" value="Saving eta to the parameters when computed" />
   </component>
 </project>
