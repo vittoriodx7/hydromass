@@ -375,7 +375,7 @@ def ReloadModel(Mhyd, infile, mstar=None):
 
         if something_went_wrong: # do as before
 
-
+            print('WARNING: something_went_wrong')
 
             exposure = prof.effexp
 
@@ -712,7 +712,11 @@ def ReloadGP(Mhyd, infile):
 
     Mhyd.cf_prof = cf
 
+
     if something_went_wrong:
+
+        print('WARNING: something_went_wrong')
+
         prof = Mhyd.sbprof
 
         rad = prof.bins
@@ -1097,6 +1101,9 @@ def ReloadForward(Mhyd, infile):
     Mhyd.cf_prof = cf
 
     if something_went_wrong:
+
+        print('WARNING: something_went_wrong')
+
         # Now recreate operators
 
         prof = Mhyd.sbprof

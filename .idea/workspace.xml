@@ -275,7 +275,15 @@
       <option name="project" value="LOCAL" />
       <updated>1770290635631</updated>
     </task>
-    <option name="localTasksCounter" value="26" />
+    <task id="LOCAL-00026" summary="Saving also:&#10;- 'ktmod', 'ktmod_lo', 'ktmod_hi', 'kt3d', 'kt3d_lo', 'kt3d_hi'&#10;- 'sb_dec', 'sb_dec_lo', 'sb_dec_hi', 'sb', 'sb_lo', 'sb_hi', 'dens', 'dens_lo', 'dens_hi'&#10;- 'pmod', 'pmod_lo', 'pmod_hi'&#10;- 'pars', 'pardens', 'K', 'Ksb', 'Kdens', 'Kdens_m'">
+      <option name="closed" value="true" />
+      <created>1770290919708</created>
+      <option name="number" value="00026" />
+      <option name="presentableId" value="LOCAL-00026" />
+      <option name="project" value="LOCAL" />
+      <updated>1770290919708</updated>
+    </task>
+    <option name="localTasksCounter" value="27" />
     <servers />
   </component>
   <component name="Vcs.Log.Tabs.Properties">
