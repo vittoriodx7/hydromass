@@ -629,7 +629,7 @@ def Run_Mhyd_PyMC3(Mhyd,model,bkglim=None,nmcmc=1000,fit_bkg=False,back=None,
                         pfit = pfit * elongation
 
                     if fit_eta:
-                        pfit = pfit * eta
+                        pfit = pfit * eta # P_SZ = P_X * eta
 
                     P_obs = pm.MvNormal('P', mu=pfit, observed=Mhyd.sz_data.pres_sz, cov=Mhyd.sz_data.covmat_sz)  # SZ pressure likelihood
 
@@ -1078,17 +1078,21 @@ class Mhyd:
 
         if self.sbprof is not None:
 
-            rmax_sb = np.max(self.sbprof.bins * self.amin2kpc)
+            rmax_sb = np.max((self.sbprof.bins+self.sbprof.ebins) * self.amin2kpc)
 
         if self.spec_data is not None:
 
-            rmax_kt = np.max(self.spec_data.rref_x)
+            rmax_kt = np.max(self.spec_data.rout_x)
 
         if self.sz_data is not None:
 
-            rmax_sz = np.max(self.sz_data.rref_sz)
+            rmax_sz = np.max(self.sz_data.rout_sz)
 
-        self.max_rad = max(max_rad, rmax_sb, rmax_kt, rmax_sz)
+        if max_rad < max(rmax_sb, rmax_kt, rmax_sz):
+            max_rad = max(max_rad, rmax_sb, rmax_kt, rmax_sz)
+            print(f'WARNING: changing maximum radius of integration to {max_rad}')
+
+        self.max_rad = max_rad
 
     def emissivity(self, nh, rmf, type='single', kt=None, Z=0.3, elow=0.5, ehigh=2.0,
                    arf=None, unit='cr', lum_elow=0.5, lum_ehigh=2.0, outz=None, method='interp',
