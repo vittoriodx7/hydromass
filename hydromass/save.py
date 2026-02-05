@@ -320,7 +320,7 @@ def ReloadModel(Mhyd, infile, mstar=None):
 
     if not Mhyd.wlonly:
         Mhyd.samplogp0 = dpar['logP0']
-        if 'eta' in dpar.colnames:
+        if 'eta' in dpar.columns.names:
             Mhyd.eta = dpar['eta']
 
     if Mhyd.pnt:
