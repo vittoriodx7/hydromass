@@ -12,5 +12,6 @@ from .pnt import *
 from .save import *
 from .contour import *
 from .wl import *
+from .nonparametric import *
 
 
