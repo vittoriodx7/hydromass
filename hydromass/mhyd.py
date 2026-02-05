@@ -393,6 +393,7 @@ def Run_Mhyd_PyMC3(Mhyd,model,bkglim=None,nmcmc=1000,fit_bkg=False,back=None,
             elongation = 1
 
         if fit_eta:
+            print("pm.Uniform('eta', lower=0.2, upper=5)")
             eta = pm.Uniform('eta', lower=0.2, upper=5)
         else:
             eta = 1
@@ -906,10 +907,13 @@ def Run_Mhyd_PyMC3(Mhyd,model,bkglim=None,nmcmc=1000,fit_bkg=False,back=None,
 
     if not wlonly:
         samplogp0 = np.array(trace.posterior['logp0']).flatten()
+        Mhyd.samplogp0 = samplogp0
+        if fit_eta:
+            eta = np.array(trace.posterior['eta']).flatten()
+            Mhyd.eta = eta
 
     Mhyd.samppar = samppar
-    if not wlonly:
-        Mhyd.samplogp0 = samplogp0
+
 
     Mhyd.elong = elong
 

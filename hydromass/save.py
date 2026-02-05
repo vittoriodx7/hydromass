@@ -88,8 +88,13 @@ def SaveModel(Mhyd, model, outfile=None):
 
     if not Mhyd.wlonly:
         col = fits.Column(name='logP0', format='E', array=Mhyd.samplogp0)
-
         cols.append(col)
+
+        if hasattr(Mhyd, 'eta'):
+            col = fits.Column(name='eta', format='E', array=Mhyd.eta)
+            cols.append(col)
+
+
 
     # col = fits.Column(name='LogLike', format='E', array=Mhyd.totlike)
     #
@@ -315,6 +320,8 @@ def ReloadModel(Mhyd, infile, mstar=None):
 
     if not Mhyd.wlonly:
         Mhyd.samplogp0 = dpar['logP0']
+        if 'eta' in dpar:
+            Mhyd.eta = dpar['eta']
 
     if Mhyd.pnt:
 
