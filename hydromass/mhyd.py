@@ -179,7 +179,7 @@ def Run_Mhyd_PyMC3(Mhyd,model,bkglim=None,nmcmc=1000,fit_bkg=False,back=None,
 
     # Define maximum radius for source deprojection, assuming we have only background for r>bkglim
     if bkglim is None:
-        bkglim=np.max(rad+erad)
+        bkglim=float(np.max(rad+erad))
         Mhyd.bkglim = bkglim
         if back is None:
             back = sb[len(sb) - 1]
