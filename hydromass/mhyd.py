@@ -41,7 +41,7 @@ def Run_Mhyd_PyMC3(Mhyd,model,bkglim=None,nmcmc=1000,fit_bkg=False,back=None,
                    samplefile=None,nrc=None,nbetas=6,min_beta=0.6, nmore=5,
                    p0_prior=None, tune=500, dmonly=False, mstar=None, find_map=True,
                    pnt=False, pnt_model='Ettori', rmin=0., rmax=None, p0_type='sb', init='ADVI', target_accept=0.9,
-                   fit_elong=False, use_jax=True, wlonly=False, pnt_prior='sim', fit_eta=False, fix_beta_pnt=False):
+                   fit_elong=False, use_jax=True, wlonly=False, pnt_prior='sim', fit_eta=False, fix_beta_pnt=False, do_ppc=False):
     """
 
     Set up hydrostatic mass model and optimize with PyMC3. The routine takes a parametric mass model as input and integrates the hydrostatic equilibrium equation to predict the 3D pressure profile:
@@ -724,30 +724,31 @@ def Run_Mhyd_PyMC3(Mhyd,model,bkglim=None,nmcmc=1000,fit_bkg=False,back=None,
 
                 trace = pmjax.sample_numpyro_nuts(nmcmc, tune=tune, target_accept=target_accept)
 
-        if not wlonly:
-            Mhyd.ppc_sb = pm.sample_posterior_predictive(trace, var_names=['sb'])
+        if do_ppc:
+            if not wlonly:
+                Mhyd.ppc_sb = pm.sample_posterior_predictive(trace, var_names=['sb'])
 
-        if Mhyd.spec_data is not None and not wlonly:
+            if Mhyd.spec_data is not None and not wlonly:
 
-            Mhyd.ppc_kt = pm.sample_posterior_predictive(trace, var_names=['kt'])
+                Mhyd.ppc_kt = pm.sample_posterior_predictive(trace, var_names=['kt'])
 
-        if Mhyd.sz_data is not None and not wlonly:
+            if Mhyd.sz_data is not None and not wlonly:
 
-            if Mhyd.sz_data.pres_sz is not None: # Fitting the pressure
+                if Mhyd.sz_data.pres_sz is not None: # Fitting the pressure
 
-                Mhyd.ppc_sz = pm.sample_posterior_predictive(trace, var_names=['P'])
+                    Mhyd.ppc_sz = pm.sample_posterior_predictive(trace, var_names=['P'])
 
-            elif Mhyd.sz_data.y_sz is not None: # Fitting the Compton y parameter
+                elif Mhyd.sz_data.y_sz is not None: # Fitting the Compton y parameter
 
-                Mhyd.ppc_sz = pm.sample_posterior_predictive(trace, var_names=['Y'])
+                    Mhyd.ppc_sz = pm.sample_posterior_predictive(trace, var_names=['Y'])
 
-        if Mhyd.wl_data is not None:
+            if Mhyd.wl_data is not None:
 
-            Mhyd.ppc_wl = pm.sample_posterior_predictive(trace, var_names=['WL'])
+                Mhyd.ppc_wl = pm.sample_posterior_predictive(trace, var_names=['WL'])
 
-        if Mhyd.veldata is not None:
+            if Mhyd.veldata is not None:
 
-            Mhyd.ppc_vel = pm.sample_posterior_predictive(trace, var_names=['sigmav'])
+                Mhyd.ppc_vel = pm.sample_posterior_predictive(trace, var_names=['sigmav'])
 
 
     print('Done.')
@@ -1197,7 +1198,7 @@ class Mhyd:
             p0_prior=None, tune=500, dmonly=False, mstar=None, find_map=True, pnt=False,
             rmin=None, rmax=None, p0_type='sb', init='ADVI', target_accept=0.9,
             pnt_model='Ettori', fit_elong=False, fit_eta=False, use_jax=True, wlonly=False, pnt_prior='sim',
-            fix_beta_pnt=False):
+            fix_beta_pnt=False, do_ppc=True):
         '''
         Optimize the mass model using the :func:`hydromass.mhyd.Run_Mhyd_PyMC3` function.
 
@@ -1294,7 +1295,8 @@ class Mhyd:
                        use_jax=use_jax,
                        wlonly=wlonly,
                        pnt_prior=pnt_prior,
-                       fix_beta_pnt=fix_beta_pnt)
+                       fix_beta_pnt=fix_beta_pnt,
+                       do_ppc=do_ppc)
 
 
     def run_forward(self, forward=None, bkglim=None, nmcmc=1000, fit_bkg=False, back=None,

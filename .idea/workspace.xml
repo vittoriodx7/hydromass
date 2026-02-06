@@ -4,10 +4,10 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="5521cb6d-2b2a-4738-9850-2cb9dfed795b" name="Changes" comment="Saving eta to the parameters when computed">
+    <list default="true" id="5521cb6d-2b2a-4738-9850-2cb9dfed795b" name="Changes" comment="Saving and loading eta, if present">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/hydromass/contour.py" beforeDir="false" afterPath="$PROJECT_DIR$/hydromass/contour.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/hydromass/mhyd.py" beforeDir="false" afterPath="$PROJECT_DIR$/hydromass/mhyd.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/hydromass/save.py" beforeDir="false" afterPath="$PROJECT_DIR$/hydromass/save.py" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -46,16 +46,16 @@
     <option name="showLibraryContents" value="true" />
     <option name="showMembers" value="true" />
   </component>
-  <component name="PropertiesComponent"><![CDATA[{
-  "keyToString": {
-    "RunOnceActivity.ShowReadmeOnStart": "true",
-    "RunOnceActivity.TerminalTabsStorage.copyFrom.TerminalArrangementManager.252": "true",
-    "RunOnceActivity.git.unshallow": "true",
-    "git-widget-placeholder": "master",
-    "last_opened_file_path": "/home/vittorio/PycharmProjects/hydromass",
-    "settings.editor.selected.configurable": "com.jetbrains.python.configuration.PyActiveSdkModuleConfigurable"
+  <component name="PropertiesComponent">{
+  &quot;keyToString&quot;: {
+    &quot;RunOnceActivity.ShowReadmeOnStart&quot;: &quot;true&quot;,
+    &quot;RunOnceActivity.TerminalTabsStorage.copyFrom.TerminalArrangementManager.252&quot;: &quot;true&quot;,
+    &quot;RunOnceActivity.git.unshallow&quot;: &quot;true&quot;,
+    &quot;git-widget-placeholder&quot;: &quot;master&quot;,
+    &quot;last_opened_file_path&quot;: &quot;/home/vittorio/PycharmProjects/hydromass&quot;,
+    &quot;settings.editor.selected.configurable&quot;: &quot;com.jetbrains.python.configuration.PyActiveSdkModuleConfigurable&quot;
   }
-}]]></component>
+}</component>
   <component name="RecentsManager">
     <key name="CopyFile.RECENT_KEYS">
       <recent name="$PROJECT_DIR$" />
@@ -308,7 +308,23 @@
       <option name="project" value="LOCAL" />
       <updated>1770294861884</updated>
     </task>
-    <option name="localTasksCounter" value="30" />
+    <task id="LOCAL-00030" summary="Warning on max_rad + comment on eta">
+      <option name="closed" value="true" />
+      <created>1770302605829</created>
+      <option name="number" value="00030" />
+      <option name="presentableId" value="LOCAL-00030" />
+      <option name="project" value="LOCAL" />
+      <updated>1770302605830</updated>
+    </task>
+    <task id="LOCAL-00031" summary="Saving and loading eta, if present">
+      <option name="closed" value="true" />
+      <created>1770302633273</created>
+      <option name="number" value="00031" />
+      <option name="presentableId" value="LOCAL-00031" />
+      <option name="project" value="LOCAL" />
+      <updated>1770302633274</updated>
+    </task>
+    <option name="localTasksCounter" value="32" />
     <servers />
   </component>
   <component name="Vcs.Log.Tabs.Properties">
@@ -338,6 +354,8 @@
     <MESSAGE value="Common SB from sb_utils" />
     <MESSAGE value="Saving also:&#10;- 'ktmod', 'ktmod_lo', 'ktmod_hi', 'kt3d', 'kt3d_lo', 'kt3d_hi'&#10;- 'sb_dec', 'sb_dec_lo', 'sb_dec_hi', 'sb', 'sb_lo', 'sb_hi', 'dens', 'dens_lo', 'dens_hi'&#10;- 'pmod', 'pmod_lo', 'pmod_hi'&#10;- 'pars', 'pardens', 'K', 'Ksb', 'Kdens', 'Kdens_m'" />
     <MESSAGE value="Saving eta to the parameters when computed" />
-    <option name="LAST_COMMIT_MESSAGE" value="Saving eta to the parameters when computed" />
+    <MESSAGE value="Warning on max_rad + comment on eta" />
+    <MESSAGE value="Saving and loading eta, if present" />
+    <option name="LAST_COMMIT_MESSAGE" value="Saving and loading eta, if present" />
   </component>
 </project>
