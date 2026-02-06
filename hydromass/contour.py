@@ -4,10 +4,13 @@ import matplotlib.pyplot as pl
 from matplotlib.ticker import MaxNLocator
 import matplotlib as mpl
 from scipy.interpolate import InterpolatedUnivariateSpline
+import warnings
+from getdist import MCSamples, plots, loadMCSamples
+from astropy.io import fits
 
 from scipy.ndimage import gaussian_filter
 
-__all__ = ['cmap_map', 'Interp', 'Contour']
+__all__ = ['cmap_map', 'Interp', 'Contour', 'make_corner']
 
 def cmap_map(function, cmap):
     """ Applies function (which should operate on vectors of shape 3: [r, g, b]), on colormap cmap.
@@ -78,6 +81,12 @@ class Contour:
     '''
 
     def __init__(self, data=np.random.multivariate_normal([5, 2], [[.5, -0.5], [-0.5, 1.5]], 10000), labels=['A','B'], toplot=[0,1], outname='test.pdf', nbins=20, smo=1, coloured=True, title=None, verbose=True, error_on_top=True, pad=10, y=1.05):
+        warnings.warn(
+            "Contour is deprecated and is superseeded by make_corner function.",
+            category = DeprecationWarning,
+            stacklevel = 2
+        )
+
         if verbose:
             if title:
                 print(f'Producing output corner plot called "{outname}" and titled: "{title}"')
@@ -192,7 +201,70 @@ class Contour:
 
 
 
+def make_corner(chainfname=None, outcorner=None, model=None, fits_model_name=None):
+    '''
+    :param chainfname: Name of input FITS file containing the data saved using the :func:`hydromass.save.SaveModel` or :func:`hydromass.save.SaveForward`function
+    :type chainfname: str
+    :param outcorner: Name of the output corner file containing the output pdf name.
+    :type outcorner: str
+    :param model: A :class:`hydromass.functions.Model` or :class:`hydromass.forward.Forward` object containing the definition of the mass model
+    :type model: :class:`hydromass.functions.Model` or :class:`hydromass.forward.Forward`
+    :param fits_model_name: The name of the extension where the chain is saved, e.g. MASS MODEL or FORWARD MODEL
+    :return:
+    '''
+    chaindata = fits.open(chainfname)[fits_model_name].data
 
+    extra = []
+    if 'logP0' in chaindata.columns.names:
+        extra.append('logP0')
+    if 'eta' in chaindata.columns.names:
+        extra.append('eta')
+
+    N_fixed = sum(model.fix)
+    N_pars = len(model.parnames) - N_fixed + len(extra)
+    N_data = chaindata.shape[0]
+    data = np.zeros((N_data, N_pars))
+    labels = []
+    ranges = dict()
+    i = 0
+    for j, par in enumerate(model.parnames):
+        if not model.fix[j]:
+            data[:, i] = chaindata[par]
+            labels.append(par)
+            ranges[par] = [float(model.limits[j][0]), float(model.limits[j][1])]
+            i += 1
+    for j, par in enumerate(extra):
+        data[:, i] = chaindata[par]
+        labels.append(par)
+        i += 1
+
+    mcsample = MCSamples(
+        samples = data,
+        names = labels,
+        labels = labels,
+        weights = None,
+        label = None,
+        loglikes = None,
+        ranges = ranges
+    )
+    mcsample.updateSettings({'contours': [0.6827, 0.9545], 'smooth_scale_2D': 3, 'smooth_scale_1D': 3})
+    g = plots.get_subplot_plotter(width_inch = 4)
+    g.settings.axes_fontsize = 30
+    g.settings.axes_labelsize = 30
+    g.settings.legend_fontsize = 20
+    g.settings.title_limit_fontsize = 30
+    g.settings.fig_width_inch = 30
+    g.settings.num_plot_contours = 3
+    g.settings.alpha_factor_contour_lines = 0
+    g.settings.norm_1d_density = True
+    g.settings.line_styles = 'tab10'
+    g.settings.alpha_filled_add = 0.5
+
+    plot_samples = [mcsample]
+    contour_samples = ['C0']
+
+    g.triangle_plot(plot_samples, labels, filled = False, title_limit = 1, contour_colors = contour_samples)
+    g.fig.savefig(outcorner)
 
 
 
