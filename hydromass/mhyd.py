@@ -995,12 +995,12 @@ class Mhyd:
     :type cosmo: class:`astropy.cosmology`
     :param abund: Solar abundance table. Available are 'angr' (Anders & Grevesse 1987), 'aspl' (Asplund et al. 2009), and 'grsa' (Grevesse & Sauval 2005). Defaults to 'aspl'
     :type abund: str
-    :param max_rad: Maximum radius out where cluster model is considered. Default 1 kpc to go back to the data
+    :param max_rad: Maximum radius out where cluster model is considered. Default 0 kpc to go back to the data
     :type max_rad: float
     """
 
     def __init__(self, sbprofile=None, spec_data=None, sz_data=None, wl_data=None, vel_data=None, directory=None, redshift=None, cosmo=None,
-                 abund = 'aspl', Zs=0.3, max_rad=1):
+                 abund = 'aspl', Zs=0.3, max_rad=0):
 
         logger = logging.getLogger('hydromass')
         if not logger.hasHandlers():

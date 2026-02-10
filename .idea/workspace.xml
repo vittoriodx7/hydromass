@@ -4,15 +4,8 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="5521cb6d-2b2a-4738-9850-2cb9dfed795b" name="Changes" comment="Added make_corner function to make corner plot for mass model and forward case">
-      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/hydromass/emissivity.py" beforeDir="false" afterPath="$PROJECT_DIR$/hydromass/emissivity.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/hydromass/forward.py" beforeDir="false" afterPath="$PROJECT_DIR$/hydromass/forward.py" afterDir="false" />
+    <list default="true" id="5521cb6d-2b2a-4738-9850-2cb9dfed795b" name="Changes" comment="Saved kernel and pixsize if computation of PSF can be done by external code, if wanted.">
       <change beforePath="$PROJECT_DIR$/hydromass/mhyd.py" beforeDir="false" afterPath="$PROJECT_DIR$/hydromass/mhyd.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/hydromass/mu.py" beforeDir="false" afterPath="$PROJECT_DIR$/hydromass/mu.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/hydromass/plots.py" beforeDir="false" afterPath="$PROJECT_DIR$/hydromass/plots.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/hydromass/tpdata.py" beforeDir="false" afterPath="$PROJECT_DIR$/hydromass/tpdata.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/hydromass/utility.py" beforeDir="false" afterPath="$PROJECT_DIR$/hydromass/utility.py" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -345,7 +338,63 @@
       <option name="project" value="LOCAL" />
       <updated>1770370058234</updated>
     </task>
-    <option name="localTasksCounter" value="34" />
+    <task id="LOCAL-00034" summary="Added logging instead of print to save to file if a logger is created before launching hydromass">
+      <option name="closed" value="true" />
+      <created>1770712613749</created>
+      <option name="number" value="00034" />
+      <option name="presentableId" value="LOCAL-00034" />
+      <option name="project" value="LOCAL" />
+      <updated>1770712613750</updated>
+    </task>
+    <task id="LOCAL-00035" summary="Added logging instead of print to save to file if a logger is created before launching hydromass">
+      <option name="closed" value="true" />
+      <created>1770712634941</created>
+      <option name="number" value="00035" />
+      <option name="presentableId" value="LOCAL-00035" />
+      <option name="project" value="LOCAL" />
+      <updated>1770712634941</updated>
+    </task>
+    <task id="LOCAL-00036" summary="Added logging instead of print to save to file if a logger is created before launching hydromass">
+      <option name="closed" value="true" />
+      <created>1770712655339</created>
+      <option name="number" value="00036" />
+      <option name="presentableId" value="LOCAL-00036" />
+      <option name="project" value="LOCAL" />
+      <updated>1770712655339</updated>
+    </task>
+    <task id="LOCAL-00037" summary="Added logging instead of print to save to file if a logger is created before launching hydromass">
+      <option name="closed" value="true" />
+      <created>1770712662105</created>
+      <option name="number" value="00037" />
+      <option name="presentableId" value="LOCAL-00037" />
+      <option name="project" value="LOCAL" />
+      <updated>1770712662105</updated>
+    </task>
+    <task id="LOCAL-00038" summary="Debugged but found no bug. For clarity made sure min of rin=1 even if rin set to 0.">
+      <option name="closed" value="true" />
+      <created>1770712725918</created>
+      <option name="number" value="00038" />
+      <option name="presentableId" value="LOCAL-00038" />
+      <option name="project" value="LOCAL" />
+      <updated>1770712725918</updated>
+    </task>
+    <task id="LOCAL-00039" summary="Added logging instead of print to save to file if a logger is created before launching hydromass">
+      <option name="closed" value="true" />
+      <created>1770712742998</created>
+      <option name="number" value="00039" />
+      <option name="presentableId" value="LOCAL-00039" />
+      <option name="project" value="LOCAL" />
+      <updated>1770712742999</updated>
+    </task>
+    <task id="LOCAL-00040" summary="Saved kernel and pixsize if computation of PSF can be done by external code, if wanted.">
+      <option name="closed" value="true" />
+      <created>1770712798874</created>
+      <option name="number" value="00040" />
+      <option name="presentableId" value="LOCAL-00040" />
+      <option name="project" value="LOCAL" />
+      <updated>1770712798874</updated>
+    </task>
+    <option name="localTasksCounter" value="41" />
     <servers />
   </component>
   <component name="Vcs.Log.Tabs.Properties">
@@ -379,6 +428,9 @@
     <MESSAGE value="Saving and loading eta, if present" />
     <MESSAGE value="Added option to skip the ppc computation" />
     <MESSAGE value="Added make_corner function to make corner plot for mass model and forward case" />
-    <option name="LAST_COMMIT_MESSAGE" value="Added make_corner function to make corner plot for mass model and forward case" />
+    <MESSAGE value="Debugged but found no bug. For clarity made sure min of rin=1 even if rin set to 0." />
+    <MESSAGE value="Added logging instead of print to save to file if a logger is created before launching hydromass" />
+    <MESSAGE value="Saved kernel and pixsize if computation of PSF can be done by external code, if wanted." />
+    <option name="LAST_COMMIT_MESSAGE" value="Saved kernel and pixsize if computation of PSF can be done by external code, if wanted." />
   </component>
 </project>
