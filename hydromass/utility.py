@@ -20,7 +20,7 @@ def sb_utils(Mhyd, fit_bkg = False, rmin=None, rmax=None, bkglim=None, back=None
             counts = prof.counts.astype('int32')
             bkgcounts = prof.bkgcounts.astype('float32')
         else:
-            print('The fit_bkg option can only be used when fitting counts, which are not available. Reverting to default')
+            Mhyd.logger.info('The fit_bkg option can only be used when fitting counts, which are not available. Reverting to default')
             fit_bkg = False
 
     if not prof.voronoi:
@@ -107,7 +107,7 @@ def sb_utils(Mhyd, fit_bkg = False, rmin=None, rmax=None, bkglim=None, back=None
 
     except TypeError:
 
-        print('Single conversion factor provided, we will assume it is constant throughout the radial range')
+        Mhyd.logger.info('Single conversion factor provided, we will assume it is constant throughout the radial range')
 
         cf = Mhyd.ccf
 
@@ -115,13 +115,13 @@ def sb_utils(Mhyd, fit_bkg = False, rmin=None, rmax=None, bkglim=None, back=None
 
         if len(Mhyd.ccf) != len(rad):
 
-            print('The provided conversion factor has a different length as the input radial binning. Adopting the mean value.')
+            Mhyd.logger.info('The provided conversion factor has a different length as the input radial binning. Adopting the mean value.')
 
             cf = np.mean(Mhyd.ccf)
 
         else:
 
-            print('Interpolating conversion factor profile onto the radial grid')
+            Mhyd.logger.info('Interpolating conversion factor profile onto the radial grid')
 
             cf = np.interp(rout_m, rad * Mhyd.amin2kpc, Mhyd.ccf)
 
@@ -148,6 +148,7 @@ def sb_utils(Mhyd, fit_bkg = False, rmin=None, rmax=None, bkglim=None, back=None
     else:
 
         Kdens_m = calc_density_operator(rref_m / Mhyd.amin2kpc, pardens, Mhyd.amin2kpc, withbkg=False)
+
 
     Mhyd.bkglim = bkglim
 

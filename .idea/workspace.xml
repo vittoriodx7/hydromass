@@ -4,10 +4,15 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="5521cb6d-2b2a-4738-9850-2cb9dfed795b" name="Changes" comment="Saving and loading eta, if present">
+    <list default="true" id="5521cb6d-2b2a-4738-9850-2cb9dfed795b" name="Changes" comment="Added make_corner function to make corner plot for mass model and forward case">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/hydromass/contour.py" beforeDir="false" afterPath="$PROJECT_DIR$/hydromass/contour.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/hydromass/emissivity.py" beforeDir="false" afterPath="$PROJECT_DIR$/hydromass/emissivity.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/hydromass/forward.py" beforeDir="false" afterPath="$PROJECT_DIR$/hydromass/forward.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/hydromass/mhyd.py" beforeDir="false" afterPath="$PROJECT_DIR$/hydromass/mhyd.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/hydromass/mu.py" beforeDir="false" afterPath="$PROJECT_DIR$/hydromass/mu.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/hydromass/plots.py" beforeDir="false" afterPath="$PROJECT_DIR$/hydromass/plots.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/hydromass/tpdata.py" beforeDir="false" afterPath="$PROJECT_DIR$/hydromass/tpdata.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/hydromass/utility.py" beforeDir="false" afterPath="$PROJECT_DIR$/hydromass/utility.py" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -324,7 +329,23 @@
       <option name="project" value="LOCAL" />
       <updated>1770302633274</updated>
     </task>
-    <option name="localTasksCounter" value="32" />
+    <task id="LOCAL-00032" summary="Added option to skip the ppc computation">
+      <option name="closed" value="true" />
+      <created>1770370024672</created>
+      <option name="number" value="00032" />
+      <option name="presentableId" value="LOCAL-00032" />
+      <option name="project" value="LOCAL" />
+      <updated>1770370024672</updated>
+    </task>
+    <task id="LOCAL-00033" summary="Added make_corner function to make corner plot for mass model and forward case">
+      <option name="closed" value="true" />
+      <created>1770370058234</created>
+      <option name="number" value="00033" />
+      <option name="presentableId" value="LOCAL-00033" />
+      <option name="project" value="LOCAL" />
+      <updated>1770370058234</updated>
+    </task>
+    <option name="localTasksCounter" value="34" />
     <servers />
   </component>
   <component name="Vcs.Log.Tabs.Properties">
@@ -356,6 +377,8 @@
     <MESSAGE value="Saving eta to the parameters when computed" />
     <MESSAGE value="Warning on max_rad + comment on eta" />
     <MESSAGE value="Saving and loading eta, if present" />
-    <option name="LAST_COMMIT_MESSAGE" value="Saving and loading eta, if present" />
+    <MESSAGE value="Added option to skip the ppc computation" />
+    <MESSAGE value="Added make_corner function to make corner plot for mass model and forward case" />
+    <option name="LAST_COMMIT_MESSAGE" value="Added make_corner function to make corner plot for mass model and forward case" />
   </component>
 </project>
