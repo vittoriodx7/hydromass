@@ -323,6 +323,9 @@ class SpecData:
 
             return
 
+        self.kernel = kernel
+        self.pixsize = pixsize
+
         # Sort pixels into radial bins
         tol = 0.5e-5
 
