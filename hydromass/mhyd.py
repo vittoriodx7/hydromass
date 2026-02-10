@@ -1,3 +1,5 @@
+import logging
+import sys
 import os
 import numpy as np
 import time
@@ -119,7 +121,7 @@ def Run_Mhyd_PyMC3(Mhyd,model,bkglim=None,nmcmc=1000,fit_bkg=False,back=None,
 
     if fit_elong and fit_eta:
 
-        print('Elongation and eta are completely degenerate, it is not possible to fit for both at the same time. Aborting.')
+        Mhyd.logger.info('Elongation and eta are completely degenerate, it is not possible to fit for both at the same time. Aborting.')
         return
 
     # prof = Mhyd.sbprof
@@ -325,7 +327,7 @@ def Run_Mhyd_PyMC3(Mhyd,model,bkglim=None,nmcmc=1000,fit_bkg=False,back=None,
 
         if model.massmod not in ['NFW'] and pnt_model in ['Angelinelli']:
 
-            print('Angelinelli non-thermal pressure correction is currently implemented only for NFW, reverting to thermal only')
+            Mhyd.logger.info('Angelinelli non-thermal pressure correction is currently implemented only for NFW, reverting to thermal only')
 
             pnt = False
 
@@ -341,7 +343,7 @@ def Run_Mhyd_PyMC3(Mhyd,model,bkglim=None,nmcmc=1000,fit_bkg=False,back=None,
 
     if Mhyd.veldata is not None and not pnt:
 
-        print('Warning: velocity data were provided but pnt is set to False. The velocity data will be ignored.')
+        Mhyd.logger.info('Warning: velocity data were provided but pnt is set to False. The velocity data will be ignored.')
 
     with hydro_model:
         # Model parameters
@@ -361,13 +363,13 @@ def Run_Mhyd_PyMC3(Mhyd,model,bkglim=None,nmcmc=1000,fit_bkg=False,back=None,
 
                 if model.massmod == 'EIN3':
 
-                    print(f'pm.TruncatedNormal({name}, mu={model.start[i]}, sigma={model.sd[i]}, lower={lim[0]}, upper={lim[1]})')
+                    Mhyd.logger.info(f'pm.TruncatedNormal({name}, mu={model.start[i]}, sigma={model.sd[i]}, lower={lim[0]}, upper={lim[1]})')
 
                     pymc_vars[name] = pm.TruncatedNormal(name, mu=model.start[i], sigma=model.sd[i], lower=lim[0], upper=lim[1])
 
                 else:
 
-                    print(f'pm.Uniform({name}, lower={lim[0]}, upper={lim[1]})')
+                    Mhyd.logger.info(f'pm.Uniform({name}, lower={lim[0]}, upper={lim[1]})')
 
                     pymc_vars[name] = pm.Uniform(name, lower=lim[0], upper=lim[1])
 
@@ -375,7 +377,7 @@ def Run_Mhyd_PyMC3(Mhyd,model,bkglim=None,nmcmc=1000,fit_bkg=False,back=None,
 
             else:
 
-                print(f'pm.Deterministic({name}, pm.math.constant({model.start[i]}))')
+                Mhyd.logger.info(f'pm.Deterministic({name}, pm.math.constant({model.start[i]}))')
 
                 pymc_vars[name] = pm.Deterministic(name, pm.math.constant(model.start[i]))
 
@@ -393,7 +395,7 @@ def Run_Mhyd_PyMC3(Mhyd,model,bkglim=None,nmcmc=1000,fit_bkg=False,back=None,
             elongation = 1
 
         if fit_eta:
-            print("pm.Uniform('eta', lower=0.2, upper=5)")
+            Mhyd.logger.info("pm.Uniform('eta', lower=0.2, upper=5)")
             eta = pm.Uniform('eta', lower=0.2, upper=5)
         else:
             eta = 1
@@ -429,7 +431,7 @@ def Run_Mhyd_PyMC3(Mhyd,model,bkglim=None,nmcmc=1000,fit_bkg=False,back=None,
 
                 P0_est = estimate_P0(Mhyd=Mhyd, dens=p0_type)
 
-                print('Estimated value of P0: %g' % (P0_est))
+                Mhyd.logger.info('Estimated value of P0: %g' % (P0_est))
 
                 err_P0_est = P0_est # 1 in ln
 
@@ -437,7 +439,7 @@ def Run_Mhyd_PyMC3(Mhyd,model,bkglim=None,nmcmc=1000,fit_bkg=False,back=None,
                                        lower=np.log(P0_est) - np.log(10),
                                        upper=np.log(P0_est) + np.log(10))
 
-            print(f"pm.TruncatedNormal('logp0', mu={np.log(P0_est)}, sigma={err_P0_est / P0_est}, "
+            Mhyd.logger.info(f"pm.TruncatedNormal('logp0', mu={np.log(P0_est)}, sigma={err_P0_est / P0_est}, "
                   f"lower={np.log(P0_est) - np.log(10)}, upper={np.log(P0_est) + np.log(10)})")
 
             if pnt :
@@ -538,7 +540,7 @@ def Run_Mhyd_PyMC3(Mhyd,model,bkglim=None,nmcmc=1000,fit_bkg=False,back=None,
 
                 if pnt_model!= 'Angelinelli' and pnt_model!='Ettori':
 
-                    print(f'Invalid Pnt model {pnt_model}, neglecting Pnt correction')
+                    Mhyd.logger.info(f'Invalid Pnt model {pnt_model}, neglecting Pnt correction')
 
                     pth = press_out
 
@@ -699,7 +701,7 @@ def Run_Mhyd_PyMC3(Mhyd,model,bkglim=None,nmcmc=1000,fit_bkg=False,back=None,
 
     tinit = time.time()
 
-    print('Running HMC...')
+    Mhyd.logger.info('Running HMC...')
 
     with hydro_model:
 
@@ -751,13 +753,13 @@ def Run_Mhyd_PyMC3(Mhyd,model,bkglim=None,nmcmc=1000,fit_bkg=False,back=None,
                 Mhyd.ppc_vel = pm.sample_posterior_predictive(trace, var_names=['sigmav'])
 
 
-    print('Done.')
+    Mhyd.logger.info('Done.')
 
     tend = time.time()
 
-    print(' Total computing time is: ', (tend - tinit) / 60., ' minutes')
+    Mhyd.logger.info(f' Total computing time is: {(tend - tinit) / 60.} minutes')
 
-    print('Computing log_likelihood')
+    Mhyd.logger.info('Computing log_likelihood')
 
     with hydro_model:
 
@@ -993,12 +995,22 @@ class Mhyd:
     :type cosmo: class:`astropy.cosmology`
     :param abund: Solar abundance table. Available are 'angr' (Anders & Grevesse 1987), 'aspl' (Asplund et al. 2009), and 'grsa' (Grevesse & Sauval 2005). Defaults to 'aspl'
     :type abund: str
-    :param max_rad: Maximum radius out where cluster model is considered. Default 4000 kpc
+    :param max_rad: Maximum radius out where cluster model is considered. Default 1 kpc to go back to the data
     :type max_rad: float
     """
 
     def __init__(self, sbprofile=None, spec_data=None, sz_data=None, wl_data=None, vel_data=None, directory=None, redshift=None, cosmo=None,
-                 abund = 'aspl', Zs=0.3, max_rad=3000):
+                 abund = 'aspl', Zs=0.3, max_rad=1):
+
+        logger = logging.getLogger('hydromass')
+        if not logger.hasHandlers():
+            # Fallback: Define the "default" here because nothing else exists
+            logger.setLevel(logging.INFO)
+            sh = logging.StreamHandler(sys.stdout)
+            sh.setFormatter(logging.Formatter('%(asctime)s @%(name)-25s "%(message)s"', datefmt = '%d-%m-%y %H:%M'))
+            logger.addHandler(sh)
+
+        self.logger = logger
 
         file_abund = get_data_file_path('abundances.dat')
 
@@ -1006,7 +1018,7 @@ class Mhyd:
 
         if directory is None:
 
-            print('No output directory name provided, will output to subdirectory "mhyd" ')
+            self.logger.info('No output directory name provided, will output to subdirectory "mhyd" ')
 
             directory = 'mhyd'
 
@@ -1018,7 +1030,7 @@ class Mhyd:
 
         if sbprofile is None:
 
-            print('Error: no surface brightness profile provided, please provide one with the "sbprofile=" option')
+            self.logger.info('Error: no surface brightness profile provided, please provide one with the "sbprofile=" option')
 
             return
 
@@ -1026,14 +1038,14 @@ class Mhyd:
 
         if redshift is None:
 
-            print('Error: no redshift provided, please provide one with the "redshift=" option')
+            self.logger.info('Error: no redshift provided, please provide one with the "redshift=" option')
             return
 
         self.redshift = redshift
 
         if cosmo is None:
 
-            print('No cosmology provided, will default to Planck15')
+            self.logger.info('No cosmology provided, will default to Planck15')
 
             from astropy.cosmology import Planck15 as cosmo
 
@@ -1041,17 +1053,18 @@ class Mhyd:
 
         self.dlum = float(cosmo.luminosity_distance(redshift).value)
 
-        print('Luminosity distance to the source: %g Mpc' % (self.dlum))
+        self.logger.info(f'Luminosity distance to the source: {self.dlum:g} Mpc')
 
         amin2kpc = cosmo.kpc_proper_per_arcmin(redshift).value
 
         self.amin2kpc = amin2kpc
 
-        print('At the redshift of the source 1 arcmin is %g kpc' % (self.amin2kpc))
+        self.logger.info(f'At the redshift of the source 1 arcmin is {self.amin2kpc:g} kpc')
 
         if spec_data is None and sz_data is None:
 
-            print('Error: no spectral data file or SZ data file provided, please provide at least one with the "spec_data=" or "sz_data=" options')
+            self.logger.info('Error: no spectral data file or SZ data file provided, please provide at least one with the "spec_data=" or "sz_data=" '
+                          'options')
 
             return
 
@@ -1091,7 +1104,7 @@ class Mhyd:
 
         if max_rad < max(rmax_sb, rmax_kt, rmax_sz):
             max_rad = max(max_rad, rmax_sb, rmax_kt, rmax_sz)
-            print(f'WARNING: changing maximum radius of integration to {max_rad}')
+            self.logger.info(f'WARNING: changing maximum radius of integration to {max_rad}')
 
         self.max_rad = max_rad
 
@@ -1145,13 +1158,13 @@ class Mhyd:
 
             else:
 
-                print('Error: no temperature provided, cannot proceed')
+                Mhyd.logger.info('Error: no temperature provided, cannot proceed')
 
                 return
 
         if type == 'single':
 
-            print('Mean cluster temperature:', kt, ' keV')
+            Mhyd.logger.info(f'Mean cluster temperature: {kt} keV')
 
             self.ccf, self.lumfact, _, _, _ = calc_emissivity(cosmo=self.cosmo,
                                             z=self.redshift,
@@ -1191,7 +1204,6 @@ class Mhyd:
                                     out_cfact_file=out_cfact_file,
                                     quiet=quiet
                                     )
-
 
     def run(self, model=None, bkglim=None, nmcmc=1000, fit_bkg=False, back=None,
             samplefile=None, nrc=None, nbetas=6, min_beta=0.6, nmore=5,
@@ -1263,7 +1275,7 @@ class Mhyd:
 
         if model is None:
 
-            print('Error: No mass model provided')
+            self.logger.info('Error: No mass model provided')
 
             return
 
@@ -1338,7 +1350,7 @@ class Mhyd:
         '''
         if forward is None:
 
-            print('Error no forward model provided')
+            self.logger.info('Error no forward model provided')
 
             return
 
@@ -1393,7 +1405,7 @@ class Mhyd:
         '''
         if Polytropic is None:
 
-            print('Error no polytropic model provided')
+            self.logger.info('Error no polytropic model provided')
 
             return
 
