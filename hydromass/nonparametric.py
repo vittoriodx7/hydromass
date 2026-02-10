@@ -1,3 +1,4 @@
+import ipdb
 import numpy as np
 import matplotlib.pyplot as plt
 import pymc as pm
@@ -278,7 +279,7 @@ def kt_GP_from_samples(Mhyd, nmore=5):
     """
 
     if Mhyd.spec_data is None:
-        print('No spectral data provided')
+        Mhyd.logger.info('No spectral data provided')
 
         return
 
@@ -361,7 +362,7 @@ def P_GP_from_samples(Mhyd, nmore=5):
 
     if Mhyd.sz_data is None:
 
-        print('No SZ data provided')
+        Mhyd.logger.info('No SZ data provided')
 
         return
 
@@ -1010,7 +1011,7 @@ def Run_NonParametric_PyMC3(Mhyd, bkglim=None, nmcmc=1000, fit_bkg=False, back=N
 
             err_T0_est = T0extend[1]
 
-        print('T0 prior and width:',T0_est,err_T0_est)
+        Mhyd.logger.info(f'T0 prior and width: {T0_est}, {err_T0_est}')
 
         if rout_m[ntm - 1] > np.max(Mhyd.spec_data.rout_x):
             # Power law outside of the fitted range
@@ -1024,7 +1025,7 @@ def Run_NonParametric_PyMC3(Mhyd, bkglim=None, nmcmc=1000, fit_bkg=False, back=N
     else:
         Mhyd.extend = False
 
-    with hydro_model:
+    with (hydro_model):
         # Priors for unknown model parameters
         coefs = pm.Normal('coefs', mu=testval, sigma=20, shape=npt)
 
@@ -1057,7 +1058,13 @@ def Run_NonParametric_PyMC3(Mhyd, bkglim=None, nmcmc=1000, fit_bkg=False, back=N
 
         if force_positive_mass:
 
-            tvalid = np.where(rout_m > rmin_kpc)
+            tvalid_0 = (rout_m > rmin_kpc)
+
+            tvalid_1 = tvalid_0[1:] & tvalid_0[:-1]
+
+            tvalid_2 = tvalid_1[1:] & tvalid_1[:-1]
+
+            log_r = pm.math.log(rout_m)
 
             log_t = pm.math.log(t3d)
 
@@ -1065,15 +1072,38 @@ def Run_NonParametric_PyMC3(Mhyd, bkglim=None, nmcmc=1000, fit_bkg=False, back=N
 
             log_P = log_t + log_d
 
+            d_log_r = log_r[1:] - log_r[:-1]
+
             d_log_P = log_P[1:] - log_P[:-1]
 
-            violation = pm.math.maximum(0, d_log_P)
+            raw_slope = - d_log_P / d_log_r
 
-            pm.Potential("force_positive_mass", -1e6 * pm.math.sum(violation[tvalid] ** 2))
+            slope_P = pm.math.maximum(raw_slope, 1e-9) # Negative so that this is a positive term for mass
+
+            log_M = log_r[1:] + log_t[1:] + pm.math.log(slope_P)
+
+            d_log_r_2 = log_r[2:] - log_r[:-2]
+
+            log_M_slope = (log_M[1:] - log_M[:-1]) / d_log_r_2
+
+            pos_violation = pm.math.maximum(0, -raw_slope)
+
+            v1 = pm.math.where(tvalid_1, pos_violation ** 2, 0.0)
+
+            pm.Potential("force_positive_mass", -5 * pm.math.sum(v1)) # Penalizes when - d_log_P / d_log_r is negative
+
+            inc_violation = pm.math.maximum(0, -log_M_slope)
+
+            v2 = pm.math.where(tvalid_2, inc_violation ** 2, 0.0)
+
+            pm.Potential("force_increasing_mass", -5 * pm.math.sum(v2)) # Penalizes when d_log_M / d_log_r is negative
+
 
         if force_convective_stability:
 
-            tvalid = np.where(rout_m > rmin_kpc)
+            tvalid_0 = (rout_m > rmin_kpc)
+
+            tvalid_1 = tvalid_0[1:] & tvalid_0[:-1]
 
             log_t = pm.math.log(t3d)
 
@@ -1081,11 +1111,19 @@ def Run_NonParametric_PyMC3(Mhyd, bkglim=None, nmcmc=1000, fit_bkg=False, back=N
 
             log_K = log_t - (2.0/3.0) * log_d
 
+            log_r = pm.math.log(rout_m)
+
+            d_log_r = log_r[1:] - log_r[:-1]
+
             d_log_K = log_K[1:] - log_K[:-1]
 
-            violation = pm.math.maximum(0, -d_log_K)
+            slope_K = d_log_K / d_log_r
 
-            pm.Potential("force_convective_stability", -1e6 * pm.math.sum(violation[tvalid] ** 2))
+            violation = pm.math.maximum(0, -slope_K)
+
+            v0 = pm.math.where(tvalid_1, violation ** 2, 0.0)
+
+            pm.Potential("force_convective_stability", -10 * pm.math.sum(v0)) # Penalizes when - d_log_K / d_log_r is negative
 
         # Density Likelihood
         if fit_bkg:
@@ -1122,7 +1160,7 @@ def Run_NonParametric_PyMC3(Mhyd, bkglim=None, nmcmc=1000, fit_bkg=False, back=N
 
     tinit = time.time()
 
-    print('Running MCMC...')
+    Mhyd.logger.info('Running MCMC...')
 
     isjax = False
 
@@ -1130,7 +1168,7 @@ def Run_NonParametric_PyMC3(Mhyd, bkglim=None, nmcmc=1000, fit_bkg=False, back=N
         import pymc.sampling.jax as pmjax
 
     except ImportError:
-        print('JAX not found, using default sampler')
+        Mhyd.logger.info('JAX not found, using default sampler')
 
     else:
         isjax = True
@@ -1144,27 +1182,27 @@ def Run_NonParametric_PyMC3(Mhyd, bkglim=None, nmcmc=1000, fit_bkg=False, back=N
 
             if not isjax:
 
-                trace = pm.sample(nmcmc, initvals=start, tune=tune)
+                trace = pm.sample(nmcmc, initvals=start, tune=tune, target_accept=0.98)
 
             else:
 
-                trace = pmjax.sample_numpyro_nuts(nmcmc, initvals=start, tune=tune)
+                trace = pmjax.sample_numpyro_nuts(nmcmc, initvals=start, tune=tune, target_accept=0.98)
 
         else:
 
             if not isjax:
 
-                trace = pm.sample(nmcmc, tune=tune)
+                trace = pm.sample(nmcmc, tune=tune, target_accept=0.98)
 
             else:
 
-                trace = pmjax.sample_numpyro_nuts(nmcmc, tune=tune)
+                trace = pmjax.sample_numpyro_nuts(nmcmc, tune=tune, target_accept=0.98)
 
-    print('Done.')
+    Mhyd.logger.info('Done.')
 
     tend = time.time()
 
-    print(' Total computing time is: ', (tend - tinit) / 60., ' minutes')
+    Mhyd.logger.info(f' Total computing time is: {(tend - tinit) / 60.} minutes')
 
     with hydro_model:
 

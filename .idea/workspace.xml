@@ -4,10 +4,9 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="5521cb6d-2b2a-4738-9850-2cb9dfed795b" name="Changes" comment="Fixed NP to use utility">
+    <list default="true" id="5521cb6d-2b2a-4738-9850-2cb9dfed795b" name="Changes" comment="Added force_convective_stability and force_positive_mass options. They respectively force dlogK/dlogR &gt; 0 and dlogP/dlogR &lt; 0. First one serves to have increasing entropy, second one to have increasing mass">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/hydromass/forward.py" beforeDir="false" afterPath="$PROJECT_DIR$/hydromass/forward.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/hydromass/mhyd.py" beforeDir="false" afterPath="$PROJECT_DIR$/hydromass/mhyd.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/hydromass/nonparametric.py" beforeDir="false" afterPath="$PROJECT_DIR$/hydromass/nonparametric.py" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
@@ -421,7 +420,15 @@
       <option name="project" value="LOCAL" />
       <updated>1770719002521</updated>
     </task>
-    <option name="localTasksCounter" value="44" />
+    <task id="LOCAL-00044" summary="Added force_convective_stability and force_positive_mass options. They respectively force dlogK/dlogR &gt; 0 and dlogP/dlogR &lt; 0. First one serves to have increasing entropy, second one to have increasing mass">
+      <option name="closed" value="true" />
+      <created>1770726089035</created>
+      <option name="number" value="00044" />
+      <option name="presentableId" value="LOCAL-00044" />
+      <option name="project" value="LOCAL" />
+      <updated>1770726089036</updated>
+    </task>
+    <option name="localTasksCounter" value="45" />
     <servers />
   </component>
   <component name="Vcs.Log.Tabs.Properties">
@@ -436,7 +443,6 @@
     </option>
   </component>
   <component name="VcsManagerConfiguration">
-    <MESSAGE value="Added computation of baryon and total acceleration for the forward model" />
     <MESSAGE value="Saving and loading the trace as well. Useful for model comparison when not run at the same time." />
     <MESSAGE value="Added __all__" />
     <MESSAGE value="Added rmax_sb of 4 Mpc" />
@@ -461,6 +467,7 @@
     <MESSAGE value="max_rad set to 0 by default for compatibility with previous code version" />
     <MESSAGE value="Made prof_forw_hires with the same call ans use as prof_hires" />
     <MESSAGE value="Fixed NP to use utility" />
-    <option name="LAST_COMMIT_MESSAGE" value="Fixed NP to use utility" />
+    <MESSAGE value="Added force_convective_stability and force_positive_mass options. They respectively force dlogK/dlogR &gt; 0 and dlogP/dlogR &lt; 0. First one serves to have increasing entropy, second one to have increasing mass" />
+    <option name="LAST_COMMIT_MESSAGE" value="Added force_convective_stability and force_positive_mass options. They respectively force dlogK/dlogR &gt; 0 and dlogP/dlogR &lt; 0. First one serves to have increasing entropy, second one to have increasing mass" />
   </component>
 </project>
