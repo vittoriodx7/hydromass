@@ -1,3 +1,4 @@
+import ipdb
 import numpy as np
 from astropy.io import fits
 import matplotlib.pyplot as plt
@@ -7,6 +8,7 @@ import pyproffit
 from scipy.special import gamma
 from tqdm import tqdm
 import pymc as pm
+from scipy.interpolate import interp1d
 
 from .deproject import calc_density_operator, calc_density_operator_pm, MyDeprojVol, elongation_correction_np
 from .constants import cgsamu, cgskpc, Msun, const_G_Msun_kpc, kev2erg, year, y_prefactor
@@ -1143,15 +1145,14 @@ def prof_hires(Mhyd, model, rin=None, npt=200, Z=0.3):
     :rtype: dict(30xnpt)
     """
 
-    rin_m, rout_m, index_x, index_sz, sum_mat, ntm = rads_more(Mhyd, nmore=Mhyd.nmore)
+    rin_m, rout_m, _, _, _, _ = rads_more(Mhyd, nmore=Mhyd.nmore)
 
     if rin is None:
-        rin = np.min(rin_m)
+        rin = rin_m[0]
 
-        if rin == 0:
-            rin = 1.
+    rin = max(rin, 1)
 
-    rout = np.max(rout_m)
+    rout = rout_m[-1]
 
     bins = np.linspace(np.sqrt(rin), np.sqrt(rout), npt + 1)
 
@@ -1187,7 +1188,7 @@ def prof_hires(Mhyd, model, rin=None, npt=200, Z=0.3):
 
     mt3d, mt3dl, mt3dh = np.percentile(t3d, [50., 50. - 68.3 / 2., 50. + 68.3 / 2.], axis=1)
 
-    mtp, mtpl, mtph = np.percentile(tproj, [50., 50. - 68.3 / 2., 50. + 68.3 / 2.], axis=1)
+    mtp, mtpl, mtph = np.nanpercentile(tproj, [50., 50. - 68.3 / 2., 50. + 68.3 / 2.], axis=1)
 
     mne, mnel, mneh = np.percentile(dens_m, [50., 50. - 68.3 / 2., 50. + 68.3 / 2.], axis=1)
 
