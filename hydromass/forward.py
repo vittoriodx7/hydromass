@@ -166,7 +166,7 @@ def kt_forw_from_samples(Mhyd, Forward, nmore=5):
 
     if Mhyd.spec_data is None:
 
-        print('No spectral data provided')
+        Mhyd.logger.info('No spectral data provided')
 
         return
 
@@ -256,7 +256,7 @@ def P_forw_from_samples(Mhyd, Forward, nmore=5):
 
     if Mhyd.sz_data is None:
 
-        print('No SZ data provided')
+        Mhyd.logger.info('No SZ data provided')
 
         return
 
@@ -911,7 +911,7 @@ def Run_Forward_PyMC3(Mhyd,Forward, bkglim=None,nmcmc=1000,fit_bkg=False,back=No
 
                 if name == 'p0':
 
-                    print(f'pm.TruncatedNormal({name}, mu={np.log(Forward.start[i])}, sigma={Forward.sd[i] / Forward.start[i]}, '
+                    Mhyd.logger.info(f'pm.TruncatedNormal({name}, mu={np.log(Forward.start[i])}, sigma={Forward.sd[i] / Forward.start[i]}, '
                           f'lower= {np.log(lim[0])}, upper= {np.log(lim[1])})')
 
                     tpar = pm.TruncatedNormal(name, mu=np.log(Forward.start[i]), sigma=Forward.sd[i] / Forward.start[i],
@@ -921,7 +921,7 @@ def Run_Forward_PyMC3(Mhyd,Forward, bkglim=None,nmcmc=1000,fit_bkg=False,back=No
 
                 else:
 
-                    print(f'pm.TruncatedNormal({name}, mu={Forward.start[i]}, sigma={Forward.sd[i]},lower={lim[0]}, upper={lim[1]})')
+                    Mhyd.logger.info(f'pm.TruncatedNormal({name}, mu={Forward.start[i]}, sigma={Forward.sd[i]},lower={lim[0]}, upper={lim[1]})')
 
                     modpar = pm.TruncatedNormal(name, mu=Forward.start[i], sigma=Forward.sd[i],
                                                 lower=lim[0], upper=lim[1]) #Gaussian prior on other parameters
@@ -933,7 +933,7 @@ def Run_Forward_PyMC3(Mhyd,Forward, bkglim=None,nmcmc=1000,fit_bkg=False,back=No
                 #
                 # modpar = pm.Deterministic(name, dummy_param)
 
-                print(f'pm.Deterministic({name}, pm.math.constant({Forward.start[i]}))')
+                Mhyd.logger.info(f'pm.Deterministic({name}, pm.math.constant({Forward.start[i]}))')
 
                 modpar = pm.Deterministic(name, pm.math.constant(Forward.start[i]))
 
@@ -1022,7 +1022,7 @@ def Run_Forward_PyMC3(Mhyd,Forward, bkglim=None,nmcmc=1000,fit_bkg=False,back=No
 
     tinit = time.time()
 
-    print('Running MCMC...')
+    Mhyd.logger.info('Running MCMC...')
 
     isjax = False
 
@@ -1030,7 +1030,7 @@ def Run_Forward_PyMC3(Mhyd,Forward, bkglim=None,nmcmc=1000,fit_bkg=False,back=No
         import pymc.sampling.jax as pmjax
 
     except ImportError:
-        print('JAX not found, using default sampler')
+        Mhyd.logger.info('JAX not found, using default sampler')
 
     else:
         isjax = True
@@ -1076,13 +1076,13 @@ def Run_Forward_PyMC3(Mhyd,Forward, bkglim=None,nmcmc=1000,fit_bkg=False,back=No
 
                 Mhyd.ppc_sz = pm.sample_posterior_predictive(trace, var_names=['Y'])
 
-    print('Done.')
+    Mhyd.logger.info('Done.')
 
     tend = time.time()
 
-    print(' Total computing time is: ', (tend - tinit) / 60., ' minutes')
+    Mhyd.logger.info(f' Total computing time is:  {(tend - tinit) / 60.} minutes' )
 
-    print('Computing log_likelihood')
+    Mhyd.logger.info('Computing log_likelihood')
 
     with hydro_model:
 
