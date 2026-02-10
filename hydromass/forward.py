@@ -451,7 +451,7 @@ def mass_forw_from_samples(Mhyd, Forward, rin=None, rout=None, npt=200, plot=Fal
 
         return dict
 
-def prof_forw_hires(Mhyd, Forward, nmore=5, Z=0.3): #, extra=False, max_radius=20):
+def prof_forw_hires(Mhyd, Forward, rin=None, npt=200, Z=0.3): #, extra=False, max_radius=20):
     """
     Compute best-fitting profiles and error envelopes from fitted data
 
@@ -467,7 +467,24 @@ def prof_forw_hires(Mhyd, Forward, nmore=5, Z=0.3): #, extra=False, max_radius=2
     :rtype: dict(23xnpt)
     """
 
-    rin_m, rout_m, index_x, index_sz, sum_mat, ntm = rads_more(Mhyd, nmore=nmore)
+    rin_m, rout_m, _, _, _, _ = rads_more(Mhyd, nmore=Mhyd.nmore)
+
+    if rin is None:
+        rin = rin_m[0]
+
+    rin = max(rin, 1)
+
+    rout = rout_m[-1]
+
+    bins = np.linspace(np.sqrt(rin), np.sqrt(rout), npt + 1)
+
+    bins = bins ** 2
+
+    rin_m = bins[:npt]
+
+    rout_m = bins[1:]
+
+    rref_m = (rin_m + rout_m) / 2.
 
     # if extra:
     #     # Extend the radial bins up to max_radius
