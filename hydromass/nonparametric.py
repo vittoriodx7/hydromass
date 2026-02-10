@@ -6,6 +6,7 @@ import time
 from .constants import cgskpc, cgsG, kev2erg, Msun, cgsamu, const_G_Msun_kpc, year
 from .deproject import MyDeprojVol, calc_density_operator, calc_grad_operator, list_params_density, list_params, calc_linear_operator, calc_sb_operator
 from .plots import rads_more, get_coolfunc, estimate_T0
+from .utility import sb_utils
 
 __all__ = ['calc_gp_operator', 'calc_gp_operator_lognormal', 'calc_gp_grad_operator', 'calc_gp_grad_operator_lognormal', 'kt_GP_from_samples',
            'P_GP_from_samples', 'mass_GP_from_samples', 'prof_GP_hires', 'Run_NonParametric_PyMC3']
@@ -783,183 +784,187 @@ def Run_NonParametric_PyMC3(Mhyd, bkglim=None, nmcmc=1000, fit_bkg=False, back=N
     :type find_map: bool
     """
 
-    prof = Mhyd.sbprof
-    sb = prof.profile.astype('float32')
-    esb = prof.eprof.astype('float32')
-    rad = prof.bins.astype('float32')
-    erad = prof.ebins.astype('float32')
-    if prof.counts is not None:
-        counts = prof.counts.astype('int32')
-        bkgcounts = prof.bkgcounts.astype('float32')
-        if fit_bkg:
-            print('The fit_bkg option can only be used when fitting counts, which are not available. Reverting to default')
-            fit_bkg = False
+        # prof = Mhyd.sbprof
+        # sb = prof.profile.astype('float32')
+        # esb = prof.eprof.astype('float32')
+        # rad = prof.bins.astype('float32')
+        # erad = prof.ebins.astype('float32')
+        # if prof.counts is not None:
+        #     counts = prof.counts.astype('int32')
+        #     bkgcounts = prof.bkgcounts.astype('float32')
+        #     if fit_bkg:
+        #         print('The fit_bkg option can only be used when fitting counts, which are not available. Reverting to default')
+        #         fit_bkg = False
+        #
+        # if not prof.voronoi:
+        #     area = prof.area.astype('float32')
+        #     exposure = prof.effexp.astype('float32')
+        # sb = prof.profile.astype('float32')
+        # esb = prof.eprof.astype('float32')
+        # rad = prof.bins.astype('float32')
+        # erad = prof.ebins.astype('float32')
+        # if prof.counts is not None:
+        #     counts = prof.counts.astype('int32')
+        #     bkgcounts = prof.bkgcounts.astype('float32')
+        #     if fit_bkg:
+        #         print('The fit_bkg option can only be used when fitting counts, which are not available. Reverting to default')
+        #         fit_bkg = False
+        #
+        # if not prof.voronoi:
+        #     area = prof.area.astype('float32')
+        #     exposure = prof.effexp.astype('float32')
+        #
+        # if rmax is None:
+        #     rmax = np.max(rad+erad)
+        #
+        # if rmin is None:
+        #     rmin = 0
+        #
+        # valid = np.where(np.logical_and(rad>=rmin, rad<rmax))
+        #
+        # # Define maximum radius for source deprojection, assuming we have only background for r>bkglim
+        # if bkglim is None:
+        #     bkglim=np.max(rad+erad)
+        #     Mhyd.bkglim = bkglim
+        #     if back is None:
+        #         back = sb[len(sb) - 1]
+        # else:
+        #     Mhyd.bkglim = bkglim
+        #     backreg = np.where(rad>bkglim)
+        #     if back is None:
+        #         back = np.mean(sb[backreg])
+        #
+        # # Set source region
+        # sourcereg = np.where(rad < bkglim)
+        #
+        # # Set vector with list of parameters
+        # pars = list_params(rad, sourcereg, nrc, nbetas, min_beta)
+        #
+        # Mhyd.pars = pars
+        #
+        # Mhyd.sourcereg = sourcereg
+        #
+        # npt = len(pars)
+        #
+        # if prof.psfmat is not None:
+        #     psfmat = prof.psfmat
+        # else:
+        #     psfmat = np.eye(prof.nbin)
+        #
+        # # Compute linear combination kernel
+        # if fit_bkg:
+        #
+        #     K = calc_linear_operator(rad, sourcereg, pars, area, exposure, np.transpose(psfmat)) # transformation to counts
+        #
+        # else:
+        #
+        #     Ksb = calc_sb_operator(rad, sourcereg, pars, withbkg=False)
+        #
+        #     K = np.dot(psfmat, Ksb)
+        #
+        # # Set up initial values
+        # if np.isnan(sb[0]) or sb[0] <= 0:
+        #     testval = -10.
+        # else:
+        #     testval = np.log(sb[0] / npt)
+        # if np.isnan(back) or back <= 0 or back is None:
+        #     testbkg = -10.
+        # else:
+        #     testbkg = np.log(back)
+        #
+        # z = Mhyd.redshift
+        #
+        # transf = Mhyd.transf
+        #
+        # pardens = list_params_density(rad, sourcereg, Mhyd.amin2kpc, nrc, nbetas, min_beta)
+        #
+        # if fit_bkg:
+        #
+        #     Kdens = calc_density_operator(rad, pardens, Mhyd.amin2kpc)
+        #
+        # else:
+        #
+        #     Kdens = calc_density_operator(rad, pardens, Mhyd.amin2kpc, withbkg=False)
+        #
+        # # Define the fine grid onto which the mass model will be computed
+        # rin_m, rout_m, index_x, index_sz, sum_mat, ntm = rads_more(Mhyd, nmore=nmore, extend=extend)
+        #
+        # rref_m = (rin_m + rout_m) / 2.
+        #
+        # nptmore = len(rout_m)
+        #
+        # vx = MyDeprojVol(rin_m / Mhyd.amin2kpc, rout_m / Mhyd.amin2kpc)
+        #
+        # vol = vx.deproj_vol().T
+        #
+        # Mhyd.cf_prof = None
+        #
+        # try:
+        #     nn = len(Mhyd.ccf)
+        #
+        # except TypeError:
+        #
+        #     print('Single conversion factor provided, we will assume it is constant throughout the radial range')
+        #
+        #     cf = Mhyd.ccf
+        #
+        # else:
+        #
+        #     if len(Mhyd.ccf) != len(rad):
+        #
+        #         print('The provided conversion factor has a different length as the input radial binning. Adopting the mean value.')
+        #
+        #         cf = np.mean(Mhyd.ccf)
+        #
+        #     else:
+        #
+        #         print('Interpolating conversion factor profile onto the radial grid')
+        #
+        #         cf = np.interp(rref_m, rad * Mhyd.amin2kpc, Mhyd.ccf)
+        #
+        #         Mhyd.cf_prof = cf
+        #
+        # if Mhyd.spec_data is not None:
+        #
+        #     if Mhyd.spec_data.psfmat is not None:
+        #
+        #         if extend:
+        #
+        #             nx = len(Mhyd.spec_data.temp_x)
+        #
+        #             tpsf = np.zeros((nx+1, nx+1))
+        #
+        #             tpsf[:nx,:nx] = Mhyd.spec_data.psfmat
+        #
+        #             tpsf[nx,nx] = 1.0
+        #
+        #         else:
+        #
+        #             tpsf = Mhyd.spec_data.psfmat
+        #
+        #         mat1 = np.dot(tpsf.T, sum_mat)
+        #
+        #         proj_mat = np.dot(mat1, vol)
+        #
+        #     else:
+        #
+        #         proj_mat = np.dot(sum_mat, vol)
+        #
+        # if fit_bkg:
+        #
+        #     Kdens_m = calc_density_operator(rout_m / Mhyd.amin2kpc, pardens, Mhyd.amin2kpc)
+        #
+        #     Kdens_grad = calc_grad_operator(rout_m / Mhyd.amin2kpc, pardens, Mhyd.amin2kpc)
+        #
+        # else:
+        #
+        #     Kdens_m = calc_density_operator(rout_m / Mhyd.amin2kpc, pardens, Mhyd.amin2kpc, withbkg=False)
+        #
+        #     Kdens_grad = calc_grad_operator(rout_m / Mhyd.amin2kpc, pardens, Mhyd.amin2kpc, withbkg=False)
 
-    if not prof.voronoi:
-        area = prof.area.astype('float32')
-        exposure = prof.effexp.astype('float32')
-    sb = prof.profile.astype('float32')
-    esb = prof.eprof.astype('float32')
-    rad = prof.bins.astype('float32')
-    erad = prof.ebins.astype('float32')
-    if prof.counts is not None:
-        counts = prof.counts.astype('int32')
-        bkgcounts = prof.bkgcounts.astype('float32')
-        if fit_bkg:
-            print('The fit_bkg option can only be used when fitting counts, which are not available. Reverting to default')
-            fit_bkg = False
-
-    if not prof.voronoi:
-        area = prof.area.astype('float32')
-        exposure = prof.effexp.astype('float32')
-
-    if rmax is None:
-        rmax = np.max(rad+erad)
-
-    if rmin is None:
-        rmin = 0
-
-    valid = np.where(np.logical_and(rad>=rmin, rad<rmax))
-
-    # Define maximum radius for source deprojection, assuming we have only background for r>bkglim
-    if bkglim is None:
-        bkglim=np.max(rad+erad)
-        Mhyd.bkglim = bkglim
-        if back is None:
-            back = sb[len(sb) - 1]
-    else:
-        Mhyd.bkglim = bkglim
-        backreg = np.where(rad>bkglim)
-        if back is None:
-            back = np.mean(sb[backreg])
-
-    # Set source region
-    sourcereg = np.where(rad < bkglim)
-
-    # Set vector with list of parameters
-    pars = list_params(rad, sourcereg, nrc, nbetas, min_beta)
-
-    Mhyd.pars = pars
-
-    Mhyd.sourcereg = sourcereg
-
-    npt = len(pars)
-
-    if prof.psfmat is not None:
-        psfmat = prof.psfmat
-    else:
-        psfmat = np.eye(prof.nbin)
-
-    # Compute linear combination kernel
-    if fit_bkg:
-
-        K = calc_linear_operator(rad, sourcereg, pars, area, exposure, np.transpose(psfmat)) # transformation to counts
-
-    else:
-
-        Ksb = calc_sb_operator(rad, sourcereg, pars, withbkg=False)
-
-        K = np.dot(psfmat, Ksb)
-
-    # Set up initial values
-    if np.isnan(sb[0]) or sb[0] <= 0:
-        testval = -10.
-    else:
-        testval = np.log(sb[0] / npt)
-    if np.isnan(back) or back <= 0 or back is None:
-        testbkg = -10.
-    else:
-        testbkg = np.log(back)
-
-    z = Mhyd.redshift
-
-    transf = Mhyd.transf
-
-    pardens = list_params_density(rad, sourcereg, Mhyd.amin2kpc, nrc, nbetas, min_beta)
-
-    if fit_bkg:
-
-        Kdens = calc_density_operator(rad, pardens, Mhyd.amin2kpc)
-
-    else:
-
-        Kdens = calc_density_operator(rad, pardens, Mhyd.amin2kpc, withbkg=False)
-
-    # Define the fine grid onto which the mass model will be computed
-    rin_m, rout_m, index_x, index_sz, sum_mat, ntm = rads_more(Mhyd, nmore=nmore, extend=extend)
-
-    rref_m = (rin_m + rout_m) / 2.
-
-    nptmore = len(rout_m)
-
-    vx = MyDeprojVol(rin_m / Mhyd.amin2kpc, rout_m / Mhyd.amin2kpc)
-
-    vol = vx.deproj_vol().T
-
-    Mhyd.cf_prof = None
-
-    try:
-        nn = len(Mhyd.ccf)
-
-    except TypeError:
-
-        print('Single conversion factor provided, we will assume it is constant throughout the radial range')
-
-        cf = Mhyd.ccf
-
-    else:
-
-        if len(Mhyd.ccf) != len(rad):
-
-            print('The provided conversion factor has a different length as the input radial binning. Adopting the mean value.')
-
-            cf = np.mean(Mhyd.ccf)
-
-        else:
-
-            print('Interpolating conversion factor profile onto the radial grid')
-
-            cf = np.interp(rref_m, rad * Mhyd.amin2kpc, Mhyd.ccf)
-
-            Mhyd.cf_prof = cf
-
-    if Mhyd.spec_data is not None:
-
-        if Mhyd.spec_data.psfmat is not None:
-
-            if extend:
-
-                nx = len(Mhyd.spec_data.temp_x)
-
-                tpsf = np.zeros((nx+1, nx+1))
-
-                tpsf[:nx,:nx] = Mhyd.spec_data.psfmat
-
-                tpsf[nx,nx] = 1.0
-
-            else:
-
-                tpsf = Mhyd.spec_data.psfmat
-
-            mat1 = np.dot(tpsf.T, sum_mat)
-
-            proj_mat = np.dot(mat1, vol)
-
-        else:
-
-            proj_mat = np.dot(sum_mat, vol)
-
-    if fit_bkg:
-
-        Kdens_m = calc_density_operator(rout_m / Mhyd.amin2kpc, pardens, Mhyd.amin2kpc)
-
-        Kdens_grad = calc_grad_operator(rout_m / Mhyd.amin2kpc, pardens, Mhyd.amin2kpc)
-
-    else:
-
-        Kdens_m = calc_density_operator(rout_m / Mhyd.amin2kpc, pardens, Mhyd.amin2kpc, withbkg=False)
-
-        Kdens_grad = calc_grad_operator(rout_m / Mhyd.amin2kpc, pardens, Mhyd.amin2kpc, withbkg=False)
+    testval, testbkg, npt, bkgcounts, counts, sb, esb, valid, cf, rin_m, rout_m, rref_m, proj_mat, index_sz, ntm, rad, rmin, rmax, vol, nbin = (
+        sb_utils(Mhyd, fit_bkg = fit_bkg, rmin = rmin, rmax = rmax, bkglim = bkglim, back = back, nrc = nrc,
+                 nbetas = nbetas, min_beta = min_beta, nmore = nmore))
 
     if Mhyd.spec_data is not None and Mhyd.sz_data is None:
 
@@ -1027,13 +1032,13 @@ def Run_NonParametric_PyMC3(Mhyd, bkglim=None, nmcmc=1000, fit_bkg=False, back=N
 
             al = pm.math.exp(ctot)
 
-            pred = pm.math.dot(K, al) + bkgcounts  # Predicted number of counts per annulus
+            pred = pm.math.dot(Mhyd.K, al) + bkgcounts  # Predicted number of counts per annulus
 
         else:
 
             al = pm.math.exp(coefs)
 
-            pred = pm.math.dot(K, al)
+            pred = pm.math.dot(Mhyd.K, al)
 
         # GP parameters
         #coefs_GP = pm.Normal('GP', mu=np.log(30./ngauss), sigma=20, shape=ngauss)
@@ -1044,7 +1049,7 @@ def Run_NonParametric_PyMC3(Mhyd, bkglim=None, nmcmc=1000, fit_bkg=False, back=N
 
         t3d = pm.math.dot(GPop, gpp)
 
-        dens_m = pm.math.sqrt(pm.math.dot(Kdens_m, al) / cf * transf)  # electron density in cm-3
+        dens_m = pm.math.sqrt(pm.math.dot(Mhyd.Kdens_m, al) / cf * Mhyd.transf)  # electron density in cm-3
 
         # Density Likelihood
         if fit_bkg:
@@ -1153,12 +1158,12 @@ def Run_NonParametric_PyMC3(Mhyd, bkglim=None, nmcmc=1000, fit_bkg=False, back=N
 
     if samplefile is not None:
         np.savetxt(samplefile, samples)
-        np.savetxt(samplefile + '.par', np.array([pars.shape[0] / nbetas, nbetas, min_beta, nmcmc]), header='pymc3')
+        np.savetxt(samplefile + '.par', np.array([Mhyd.pars.shape[0] / nbetas, nbetas, min_beta, nmcmc]), header='pymc3')
 
     # Compute output deconvolved brightness profile
 
     if fit_bkg:
-        Ksb = calc_sb_operator(rad, sourcereg, pars)
+        Ksb = calc_sb_operator(rad, Mhyd.sourcereg, Mhyd.pars)
 
         allsb = np.dot(Ksb, np.exp(samples.T))
 
@@ -1166,14 +1171,14 @@ def Run_NonParametric_PyMC3(Mhyd, bkglim=None, nmcmc=1000, fit_bkg=False, back=N
 
         Mhyd.bkg = bfit
 
-        allsb_conv = np.dot(prof.psfmat, allsb[:, :npt])
+        allsb_conv = np.dot(Mhyd.prof.psfmat, allsb[:, :npt])
 
     else:
-        Ksb = calc_sb_operator(rad, sourcereg, pars, withbkg=False)
+        Ksb = calc_sb_operator(rad, Mhyd.sourcereg, Mhyd.pars, withbkg=False)
 
         allsb = np.dot(Ksb, np.exp(samples.T))
 
-        allsb_conv = np.dot(K, np.exp(samples.T))
+        allsb_conv = np.dot(Mhyd.K, np.exp(samples.T))
 
     pmc = np.median(allsb, axis=1)
     pmcl = np.percentile(allsb, 50. - 68.3 / 2., axis=1)
@@ -1189,14 +1194,8 @@ def Run_NonParametric_PyMC3(Mhyd, bkglim=None, nmcmc=1000, fit_bkg=False, back=N
     Mhyd.sb_lo = pmcl
     Mhyd.sb_hi = pmch
 
-    Mhyd.nrc = nrc
-    Mhyd.nbetas = nbetas
-    Mhyd.min_beta = min_beta
-    Mhyd.nmore = nmore
-    Mhyd.pardens = pardens
-    Mhyd.fit_bkg = fit_bkg
 
-    alldens = np.sqrt(np.dot(Kdens, np.exp(samples.T)) * transf)
+    alldens = np.sqrt(np.dot(Mhyd.Kdens, np.exp(samples.T)) * Mhyd.transf)
     pmc = np.median(alldens, axis=1) / np.sqrt(Mhyd.ccf)
     pmcl = np.percentile(alldens, 50. - 68.3 / 2., axis=1) / np.sqrt(Mhyd.ccf)
     pmch = np.percentile(alldens, 50. + 68.3 / 2., axis=1) / np.sqrt(Mhyd.ccf)
@@ -1220,12 +1219,6 @@ def Run_NonParametric_PyMC3(Mhyd, bkglim=None, nmcmc=1000, fit_bkg=False, back=N
     Mhyd.bin_fact = bin_fact
     Mhyd.ngauss = ngauss
 
-    Mhyd.K = K
-    Mhyd.Kdens = Kdens
-    Mhyd.Ksb = Ksb
-    Mhyd.transf = transf
-    Mhyd.Kdens_m = Kdens_m
-    Mhyd.Kdens_grad = Kdens_grad
 
     if Mhyd.spec_data is not None:
         kt_mod = kt_GP_from_samples(Mhyd, nmore=nmore)

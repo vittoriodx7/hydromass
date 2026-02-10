@@ -1123,7 +1123,7 @@ class Model:
 
                 limits[1] = [100., 1800.]
 
-                limits[2] = [1., 20.]
+                limits[2] = [0., 20.]
 
             else:
 

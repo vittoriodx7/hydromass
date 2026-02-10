@@ -63,7 +63,7 @@ def calc_emissivity(cosmo, z, nh, kt, rmf, abund='aspl', Z=0.3, elow=0.5, ehigh=
 
     if unit!='cr' and unit!='photon':
 
-        logger.info(f'Unknown unit %s, aborting {unit}')
+        logger.info(f'Unknown unit {unit}, aborting')
         return
 
     check_xspec = is_tool('xspec')

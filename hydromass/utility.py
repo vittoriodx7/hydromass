@@ -1,7 +1,7 @@
 import numpy as np
 
 
-from .deproject import list_params, calc_linear_operator, calc_sb_operator, list_params_density, calc_density_operator, MyDeprojVol
+from .deproject import list_params, calc_linear_operator, calc_sb_operator, list_params_density, calc_density_operator, MyDeprojVol, calc_grad_operator
 from .plots import rads_more
 
 
@@ -145,9 +145,13 @@ def sb_utils(Mhyd, fit_bkg = False, rmin=None, rmax=None, bkglim=None, back=None
 
         Kdens_m = calc_density_operator(rref_m / Mhyd.amin2kpc, pardens, Mhyd.amin2kpc)
 
+        Kdens_grad = calc_grad_operator(rout_m / Mhyd.amin2kpc, pardens, Mhyd.amin2kpc)
+
     else:
 
         Kdens_m = calc_density_operator(rref_m / Mhyd.amin2kpc, pardens, Mhyd.amin2kpc, withbkg=False)
+
+        Kdens_grad = calc_grad_operator(rout_m / Mhyd.amin2kpc, pardens, Mhyd.amin2kpc, withbkg = False)
 
 
     Mhyd.bkglim = bkglim
@@ -180,6 +184,7 @@ def sb_utils(Mhyd, fit_bkg = False, rmin=None, rmax=None, bkglim=None, back=None
 
     Mhyd.Kdens_m = Kdens_m
 
+    Mhyd.Kdens_grad = Kdens_grad
 
 
 

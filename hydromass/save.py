@@ -375,6 +375,8 @@ def ReloadModel(Mhyd, infile, mstar=None):
 
         rad = prof.bins
 
+        area = prof.area
+
         cf = np.interp(rref_m, rad * Mhyd.amin2kpc, Mhyd.ccf)
 
         Mhyd.cf_prof = cf
@@ -605,7 +607,7 @@ def SaveGP(Mhyd, outfile=None):
         hdus.append(szhdu)
 
 
-    for key in ['pars', 'pardens', 'K', 'Ksb', 'Kdens', 'Kdens_m']:
+    for key in ['pars', 'pardens', 'K', 'Ksb', 'Kdens', 'Kdens_m', 'Kdens_grad']:
         tmp_hdu = fits.ImageHDU(getattr(Mhyd, key), name = key)
         hdus.append(tmp_hdu)
 
@@ -700,7 +702,7 @@ def ReloadGP(Mhyd, infile):
         else:
             something_went_wrong = True
 
-    for key in ['pars', 'pardens', 'K', 'Ksb', 'Kdens', 'Kdens_m']:
+    for key in ['pars', 'pardens', 'K', 'Ksb', 'Kdens', 'Kdens_m', 'Kdens_grad']:
         if key in fin:
             setattr(Mhyd, key, fin[key].data)
         else:

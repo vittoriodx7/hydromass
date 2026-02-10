@@ -431,7 +431,7 @@ def Run_Mhyd_PyMC3(Mhyd,model,bkglim=None,nmcmc=1000,fit_bkg=False,back=None,
 
                 P0_est = estimate_P0(Mhyd=Mhyd, dens=p0_type)
 
-                Mhyd.logger.info('Estimated value of P0: %g' % (P0_est))
+                Mhyd.logger.info(f'Estimated value of P0: {P0_est}')
 
                 err_P0_est = P0_est # 1 in ln
 
