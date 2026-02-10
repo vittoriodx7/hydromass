@@ -3,6 +3,8 @@ import matplotlib.pyplot as plt
 import pymc as pm
 import time
 
+from astropy.cosmology.units import redshift
+
 from .constants import cgskpc, cgsG, kev2erg, Msun, cgsamu, const_G_Msun_kpc, year
 from .deproject import MyDeprojVol, calc_density_operator, calc_grad_operator, list_params_density, list_params, calc_linear_operator, calc_sb_operator
 from .plots import rads_more, get_coolfunc, estimate_T0
@@ -746,7 +748,7 @@ def prof_GP_hires(Mhyd, rin=None, npt=200, Z=0.3):
 def Run_NonParametric_PyMC3(Mhyd, bkglim=None, nmcmc=1000, fit_bkg=False, back=None,
                    samplefile=None, nrc=None, nbetas=6, min_beta=0.6, nmore=5,
                    tune=500, bin_fact=1.0, smin=None, smax=None, ngauss=100, find_map=True,
-                   extend=False, T0extend=None, rmin=0., rmax=None):
+                   extend=False, T0extend=None, rmin=0., rmax=None, force_positive_mass = False, force_convective_stability = False):
     """
     Run non-parametric log-normal mixture reconstruction. Following Eckert et al. (2022), the temperature profile is described as a linear combination of a large number of log-normal functions, whereas the gas density profile is decomposed on a basis of King functions. The number of log-normal functions as well as the smoothing scales can be adjusted by the user.
 
@@ -966,6 +968,8 @@ def Run_NonParametric_PyMC3(Mhyd, bkglim=None, nmcmc=1000, fit_bkg=False, back=N
         sb_utils(Mhyd, fit_bkg = fit_bkg, rmin = rmin, rmax = rmax, bkglim = bkglim, back = back, nrc = nrc,
                  nbetas = nbetas, min_beta = min_beta, nmore = nmore))
 
+    rmin_kpc = rmin * Mhyd.amin2kpc
+
     if Mhyd.spec_data is not None and Mhyd.sz_data is None:
 
         rout_joint = Mhyd.spec_data.rout_x
@@ -1050,6 +1054,38 @@ def Run_NonParametric_PyMC3(Mhyd, bkglim=None, nmcmc=1000, fit_bkg=False, back=N
         t3d = pm.math.dot(GPop, gpp)
 
         dens_m = pm.math.sqrt(pm.math.dot(Mhyd.Kdens_m, al) / cf * Mhyd.transf)  # electron density in cm-3
+
+        if force_positive_mass:
+
+            tvalid = np.where(rout_m > rmin_kpc)
+
+            log_t = pm.math.log(t3d)
+
+            log_d = pm.math.log(dens_m)
+
+            log_P = log_t + log_d
+
+            d_log_P = log_P[1:] - log_P[:-1]
+
+            violation = pm.math.maximum(0, d_log_P)
+
+            pm.Potential("force_positive_mass", -1e6 * pm.math.sum(violation[tvalid] ** 2))
+
+        if force_convective_stability:
+
+            tvalid = np.where(rout_m > rmin_kpc)
+
+            log_t = pm.math.log(t3d)
+
+            log_d = pm.math.log(dens_m)
+
+            log_K = log_t - (2.0/3.0) * log_d
+
+            d_log_K = log_K[1:] - log_K[:-1]
+
+            violation = pm.math.maximum(0, -d_log_K)
+
+            pm.Potential("force_convective_stability", -1e6 * pm.math.sum(violation[tvalid] ** 2))
 
         # Density Likelihood
         if fit_bkg:

@@ -703,7 +703,7 @@ class Forward:
 
 def Run_Forward_PyMC3(Mhyd,Forward, bkglim=None,nmcmc=1000,fit_bkg=False,back=None,
                    samplefile=None,nrc=None,nbetas=6,min_beta=0.6, nmore=5,
-                   tune=500, find_map=True, rmin=0., rmax=None):
+                   tune=500, find_map=True, rmin=0., rmax=None, force_positive_mass = False, force_convective_stability = False):
     """
     Set up parametric forward model fit and optimize with PyMC3. The routine takes a parametric function for the 3D gas pressure profile as input and optimizes jointly for the gas density and pressure profiles. The mass profile is then computed point by point using the analytic derivative of the model pressure profile:
 
@@ -892,6 +892,8 @@ def Run_Forward_PyMC3(Mhyd,Forward, bkglim=None,nmcmc=1000,fit_bkg=False,back=No
         sb_utils(Mhyd, fit_bkg = fit_bkg, rmin = rmin, rmax = rmax, bkglim = bkglim, back = back, nrc = nrc,
                                                  nbetas = nbetas, min_beta = min_beta, nmore = nmore))
 
+    rmin_kpc = rmin * Mhyd.amin2kpc
+
     hydro_model = pm.Model()
 
     with hydro_model:
@@ -961,6 +963,34 @@ def Run_Forward_PyMC3(Mhyd,Forward, bkglim=None,nmcmc=1000,fit_bkg=False,back=No
         dens_m = pm.math.sqrt(pm.math.dot(Mhyd.Kdens_m, al) / cf * Mhyd.transf)  # electron density in cm-3
 
         p3d = Forward.func_pm(rout_m, *pmod)
+
+        if force_positive_mass:
+
+            tvalid = np.where(rout_m > rmin_kpc)
+
+            log_P = pm.math.log(p3d)
+
+            d_log_P = log_P[1:] - log_P[:-1]
+
+            violation = pm.math.maximum(0, d_log_P)
+
+            pm.Potential("force_positive_mass", -1e6 * pm.math.sum(violation[tvalid] ** 2))
+
+        if force_convective_stability:
+
+            tvalid = np.where(rout_m > rmin_kpc)
+
+            log_d = pm.math.log(dens_m)
+
+            log_t = pm.math.log(p3d) - log_d
+
+            log_K = log_t - (2.0/3.0) * log_d
+
+            d_log_K = log_K[1:] - log_K[:-1]
+
+            violation = pm.math.maximum(0, -d_log_K)
+
+            pm.Potential("force_convective_stability", -1e6 * pm.math.sum(violation[tvalid] ** 2))
 
         # Density Likelihood
         if fit_bkg:

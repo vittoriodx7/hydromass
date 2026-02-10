@@ -1312,7 +1312,8 @@ class Mhyd:
 
 
     def run_forward(self, forward=None, bkglim=None, nmcmc=1000, fit_bkg=False, back=None,
-            samplefile=None, nrc=None, nbetas=6, min_beta=0.6, nmore=5, tune=500, find_map=True, rmin=0, rmax=None):
+            samplefile=None, nrc=None, nbetas=6, min_beta=0.6, nmore=5, tune=500, find_map=True, rmin=0, rmax=None, force_positive_mass = False,
+                    force_convective_stability = False):
 
         '''
         Optimize a parametric forward fit to the gas pressure profile using the :func:`hydromass.forward.Run_Forward_PyMC3` function
@@ -1369,7 +1370,10 @@ class Mhyd:
                           tune=tune,
                           find_map=find_map,
                           rmin=rmin,
-                          rmax=rmax)
+                          rmax=rmax,
+                          force_positive_mass = force_positive_mass,
+                          force_convective_stability = force_convective_stability
+                          )
 
     def run_polytropic(self, Polytropic=None, bkglim=None, nmcmc=1000, fit_bkg=False, back=None,
             samplefile=None, nrc=None, nbetas=6, min_beta=0.6, nmore=5, tune=500, find_map=True):
@@ -1427,7 +1431,7 @@ class Mhyd:
 
     def run_GP(self, bkglim=None, nmcmc=1000, fit_bkg=False, back=None,
             samplefile=None, nrc=None, nbetas=6, min_beta=0.6, nmore=5, tune=500, find_map=True,
-            bin_fact=1.0, smin=None, smax=None, ngauss=100, extend=False, T0extend=None, rmin=None, rmax=None):
+            bin_fact=1.0, smin=None, smax=None, ngauss=100, extend=False, T0extend=None, rmin=None, rmax=None, force_positive_mass = False, force_convective_stability = False):
 
         '''
         Run a non-parametric log-normal mixture reconstruction. See :func:`hydromass.nonparametric.Run_NonParametric_PyMC3`
@@ -1483,7 +1487,9 @@ class Mhyd:
                                 extend=extend,
                                 T0extend=T0extend,
                                 rmin = rmin,
-                                rmax = rmax
+                                rmax = rmax,
+                                force_positive_mass = force_positive_mass,
+                                force_convective_stability = force_convective_stability
                                 )
 
     def SaveModel(self, model, outfile=None):
