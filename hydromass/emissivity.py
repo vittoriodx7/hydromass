@@ -3,6 +3,8 @@ import  numpy as np
 import matplotlib.pyplot as plt
 from scipy.interpolate import interp1d
 from scipy.optimize import minimize
+import logging
+import sys
 
 __all__ = ['is_tool', 'calc_emissivity', 'medsmooth', 'vikh_temp', 'variable_ccf']
 
@@ -51,29 +53,36 @@ def calc_emissivity(cosmo, z, nh, kt, rmf, abund='aspl', Z=0.3, elow=0.5, ehigh=
     :return: Conversion factor
     :rtype: float
     """
+    logger = logging.getLogger('hydromass')
+    if not logger.hasHandlers():
+        # Fallback: Define the "default" here because nothing else exists
+        logger.setLevel(logging.INFO)
+        sh = logging.StreamHandler(sys.stdout)
+        sh.setFormatter(logging.Formatter('%(asctime)s @%(name)-25s "%(message)s"', datefmt = '%d-%m-%y %H:%M'))
+        logger.addHandler(sh)
 
     if unit!='cr' and unit!='photon':
 
-        print('Unknown unit %s, aborting' % (unit))
+        logger.info(f'Unknown unit %s, aborting {unit}')
         return
 
     check_xspec = is_tool('xspec')
 
     if not check_xspec:
 
-        print('Error: XSPEC cannot be found in path')
+        logger.info('Error: XSPEC cannot be found in path')
 
         return
 
     if not os.path.exists(rmf):
 
-        print('Error: RMF file not found, aborting')
+        logger.info('Error: RMF file not found, aborting')
 
         return
 
     if arf is not None and not os.path.exists(arf):
 
-        print('Error: ARF file not found, aborting')
+        logger.info('Error: ARF file not found, aborting')
 
         return
 
@@ -286,7 +295,7 @@ def variable_ccf(Mhyd, cosmo, z, nh, rmf, method='interp', abund='aspl', elow=0.
 
     if Mhyd.spec_data is None:
 
-        print('No spectral data loaded, aborting')
+        Mhyd.logger.info('No spectral data loaded, aborting')
 
         return
 
@@ -363,7 +372,7 @@ def variable_ccf(Mhyd, cosmo, z, nh, rmf, method='interp', abund='aspl', elow=0.
     else:
 
         if method != 'interp':
-            print('Unknown method %s, reverting to interpolation' % (method))
+            Mhyd.logger.info(f'Unknown method {method}, reverting to interpolation')
 
         fill_value = (spec_data.temp_x[0], spec_data.temp_x[nkt - 1])
 
@@ -378,7 +387,7 @@ def variable_ccf(Mhyd, cosmo, z, nh, rmf, method='interp', abund='aspl', elow=0.
 
     if spec_data.zfe is None:
 
-        print('No abundance value loaded, assuming 0.3 everywhere')
+        Mhyd.logger.info('No abundance value loaded, assuming 0.3 everywhere')
 
         zfe_prof = np.empty(nbin)
 
@@ -407,7 +416,7 @@ def variable_ccf(Mhyd, cosmo, z, nh, rmf, method='interp', abund='aspl', elow=0.
 
     else:
 
-        print('Modeling abundance profile...')
+        Mhyd.logger.info('Modeling abundance profile...')
 
         active = np.where(spec_data.zfe_lo > 0.)
 
