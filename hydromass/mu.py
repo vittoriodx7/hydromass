@@ -1,4 +1,6 @@
 import numpy as np
+import logging
+import sys
 
 __all__ = ['mean_molecular_weights']
 
@@ -15,6 +17,14 @@ def mean_molecular_weights(infile, abund='aspl', Zs=0.3):
     :return: Mean molecular weight, ratio of number densities of electrons to ions, mean molecular weight per electron
     :type float, float, float
     '''
+
+    logger = logging.getLogger('hydromass')
+    if not logger.hasHandlers():
+        # Fallback: Define the "default" here because nothing else exists
+        logger.setLevel(logging.INFO)
+        sh = logging.StreamHandler(sys.stdout)
+        sh.setFormatter(logging.Formatter('%(asctime)s @%(name)-25s "%(message)s"', datefmt = '%d-%m-%y %H:%M'))
+        logger.addHandler(sh)
 
     fin = open(infile, 'r')
     lin = fin.readlines()
@@ -55,19 +65,19 @@ def mean_molecular_weights(infile, abund='aspl', Zs=0.3):
 
     Z = np.sum(Xj[2:])
 
-    print('X:', X)
-    print('Y:', Y)
-    print('Z:', Z)
+    logger.info(f'X: {X}')
+    logger.info(f'Y: {Y}')
+    logger.info(f'Z: {Z}')
 
     mup = 1 / np.sum((1. + atomic_numbers) / atomic_weights * abvec * Xj) # Eq. 10.20 of Carroll
 
-    print('Mean molecular weight:', mup)
+    logger.info(f'Mean molecular weight: {mup}')
 
     nhc = np.sum(atomic_numbers * Ns * abvec) / Ns[0] # electrons / Hydrogen nuclei
 
-    print('Number ratio of electrons to H:', nhc)
+    logger.info(f'Number ratio of electrons to H: {nhc}')
 
     mu_e = 1 / np.sum(atomic_numbers / atomic_weights * abvec * Xj)
-    print('Mean molecular weight per electron:', mu_e)
+    logger.info(f'Mean molecular weight per electron: {mu_e}' )
 
     return mup, nhc, mu_e
