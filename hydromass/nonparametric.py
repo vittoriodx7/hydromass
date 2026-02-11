@@ -16,6 +16,10 @@ __all__ = ['calc_gp_operator', 'calc_gp_operator_lognormal', 'calc_gp_grad_opera
 
 # Function to compute linear operator transforming norms of GP model into radial profile
 
+
+def softplus(x):
+    return pm.math.log(1+pm.math.exp(x))
+
 def calc_gp_operator(npt, rads, rin, rout, bin_fact=1.0, smin=None, smax=None):
     '''
     Set up a linear operator transforming the model coefficients into the temperature profile as a sum of Gaussian functions,
@@ -749,7 +753,8 @@ def prof_GP_hires(Mhyd, rin=None, npt=200, Z=0.3):
 def Run_NonParametric_PyMC3(Mhyd, bkglim=None, nmcmc=1000, fit_bkg=False, back=None,
                    samplefile=None, nrc=None, nbetas=6, min_beta=0.6, nmore=5,
                    tune=500, bin_fact=1.0, smin=None, smax=None, ngauss=100, find_map=True,
-                   extend=False, T0extend=None, rmin=0., rmax=None, force_positive_mass = False, force_convective_stability = False):
+                   extend=False, T0extend=None, rmin=0., rmax=None,
+                   force_positive_mass = False, force_convective_stability = False, force_increasing_mass=False):
     """
     Run non-parametric log-normal mixture reconstruction. Following Eckert et al. (2022), the temperature profile is described as a linear combination of a large number of log-normal functions, whereas the gas density profile is decomposed on a basis of King functions. The number of log-normal functions as well as the smoothing scales can be adjusted by the user.
 
@@ -1056,7 +1061,7 @@ def Run_NonParametric_PyMC3(Mhyd, bkglim=None, nmcmc=1000, fit_bkg=False, back=N
 
         dens_m = pm.math.sqrt(pm.math.dot(Mhyd.Kdens_m, al) / cf * Mhyd.transf)  # electron density in cm-3
 
-        if force_positive_mass:
+        if force_positive_mass or force_increasing_mass or force_convective_stability:
 
             tvalid_0 = (rout_m > rmin_kpc)
 
@@ -1072,13 +1077,19 @@ def Run_NonParametric_PyMC3(Mhyd, bkglim=None, nmcmc=1000, fit_bkg=False, back=N
 
             log_P = log_t + log_d
 
+            log_K = log_t - (2.0 / 3.0) * log_d
+
             d_log_r = log_r[1:] - log_r[:-1]
 
             d_log_P = log_P[1:] - log_P[:-1]
 
-            raw_slope = - d_log_P / d_log_r
+            d_log_K = log_K[1:] - log_K[:-1]
 
-            slope_P = pm.math.maximum(raw_slope, 1e-9) # Negative so that this is a positive term for mass
+            slope_K = d_log_K / d_log_r
+
+            raw_slope_P = - d_log_P / d_log_r
+
+            slope_P = pm.math.maximum(raw_slope_P, 1e-9) # Negative so that this is a positive term for mass
 
             log_M = log_r[1:] + log_t[1:] + pm.math.log(slope_P)
 
@@ -1086,44 +1097,36 @@ def Run_NonParametric_PyMC3(Mhyd, bkglim=None, nmcmc=1000, fit_bkg=False, back=N
 
             log_M_slope = (log_M[1:] - log_M[:-1]) / d_log_r_2
 
-            pos_violation = pm.math.maximum(0, -raw_slope)
+            if force_positive_mass:
 
-            v1 = pm.math.where(tvalid_1, pos_violation ** 2, 0.0)
+                k = 10
 
-            pm.Potential("force_positive_mass", -5 * pm.math.sum(v1)) # Penalizes when - d_log_P / d_log_r is negative
+                penalty = softplus(-k * raw_slope_P) / k
 
-            inc_violation = pm.math.maximum(0, -log_M_slope)
+                v1 = pm.math.where(tvalid_1, penalty, 0.0)
 
-            v2 = pm.math.where(tvalid_2, inc_violation ** 2, 0.0)
+                pm.Potential("force_positive_mass", - pm.math.sum(v1)) # Penalizes when - d_log_P / d_log_r is negative
 
-            pm.Potential("force_increasing_mass", -5 * pm.math.sum(v2)) # Penalizes when d_log_M / d_log_r is negative
+            if force_increasing_mass:
 
+                k = 10
 
-        if force_convective_stability:
+                penalty = softplus(-k * log_M_slope) / k
 
-            tvalid_0 = (rout_m > rmin_kpc)
+                v2 = pm.math.where(tvalid_2, penalty, 0.0)
 
-            tvalid_1 = tvalid_0[1:] & tvalid_0[:-1]
+                pm.Potential("force_increasing_mass", - pm.math.sum(v2)) # Penalizes when d_log_M / d_log_r is negative
 
-            log_t = pm.math.log(t3d)
+            if force_convective_stability:
 
-            log_d = pm.math.log(dens_m)
+                k = 10
 
-            log_K = log_t - (2.0/3.0) * log_d
+                penalty = softplus(-k * slope_K) / k
 
-            log_r = pm.math.log(rout_m)
+                v0 = pm.math.where(tvalid_1, penalty, 0.0)
 
-            d_log_r = log_r[1:] - log_r[:-1]
+                pm.Potential("force_convective_stability", - pm.math.sum(v0))  # Penalizes when - d_log_K / d_log_r is negative
 
-            d_log_K = log_K[1:] - log_K[:-1]
-
-            slope_K = d_log_K / d_log_r
-
-            violation = pm.math.maximum(0, -slope_K)
-
-            v0 = pm.math.where(tvalid_1, violation ** 2, 0.0)
-
-            pm.Potential("force_convective_stability", -10 * pm.math.sum(v0)) # Penalizes when - d_log_K / d_log_r is negative
 
         # Density Likelihood
         if fit_bkg:

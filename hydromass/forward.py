@@ -11,6 +11,11 @@ from .utility import sb_utils
 __all__ = ['gnfw_pm', 'gnfw_np', 'der_lnP_np', 'kt_forw_from_samples', 'P_forw_from_samples', 'mass_forw_from_samples', 'prof_forw_hires',
            'Forward', 'Run_Forward_PyMC3']
 
+
+def softplus(x):
+    return pm.math.log(1+pm.math.exp(x))
+
+
 # GNFW function should work both for numpy.ndarray and pymc3/theano formats
 def gnfw_pm(rad, p0, c500, gamma, alfa, beta):
     '''
@@ -703,7 +708,8 @@ class Forward:
 
 def Run_Forward_PyMC3(Mhyd,Forward, bkglim=None,nmcmc=1000,fit_bkg=False,back=None,
                    samplefile=None,nrc=None,nbetas=6,min_beta=0.6, nmore=5,
-                   tune=500, find_map=True, rmin=0., rmax=None, force_positive_mass = False, force_convective_stability = False):
+                   tune=500, find_map=True, rmin=0., rmax=None,
+                   force_positive_mass = False, force_convective_stability = False, force_increasing_mass=False):
     """
     Set up parametric forward model fit and optimize with PyMC3. The routine takes a parametric function for the 3D gas pressure profile as input and optimizes jointly for the gas density and pressure profiles. The mass profile is then computed point by point using the analytic derivative of the model pressure profile:
 
@@ -964,7 +970,7 @@ def Run_Forward_PyMC3(Mhyd,Forward, bkglim=None,nmcmc=1000,fit_bkg=False,back=No
 
         p3d = Forward.func_pm(rout_m, *pmod)
 
-        if force_positive_mass:
+        if force_positive_mass or force_increasing_mass or force_convective_stability:
 
             tvalid_0 = (rout_m > rmin_kpc)
 
@@ -976,15 +982,23 @@ def Run_Forward_PyMC3(Mhyd,Forward, bkglim=None,nmcmc=1000,fit_bkg=False,back=No
 
             log_P = pm.math.log(p3d)
 
-            log_t = log_P - pm.math.log(dens_m)
+            log_d = pm.math.log(dens_m)
+
+            log_t = log_P - log_d
+
+            log_K = log_t - (2.0 / 3.0) * log_d
 
             d_log_r = log_r[1:] - log_r[:-1]
 
             d_log_P = log_P[1:] - log_P[:-1]
 
-            raw_slope = - d_log_P / d_log_r
+            raw_slope_P = - d_log_P / d_log_r
 
-            slope_P = pm.math.maximum(raw_slope, 1e-9) # Negative so that this is a positive term for mass
+            slope_P = pm.math.maximum(raw_slope_P, 1e-9) # Negative so that this is a positive term for mass
+
+            d_log_K = log_K[1:] - log_K[:-1]
+
+            slope_K = d_log_K / d_log_r
 
             log_M = log_r[1:] + log_t[1:] + pm.math.log(slope_P)
 
@@ -992,43 +1006,35 @@ def Run_Forward_PyMC3(Mhyd,Forward, bkglim=None,nmcmc=1000,fit_bkg=False,back=No
 
             log_M_slope = (log_M[1:] - log_M[:-1]) / d_log_r_2
 
-            pos_violation = pm.math.maximum(0, -raw_slope)
+            if force_positive_mass:
 
-            v1 = pm.math.where(tvalid_1, pos_violation ** 2, 0.0)
+                k = 10
 
-            pm.Potential("force_positive_mass", -5 * pm.math.sum(v1)) # Penalizes when - d_log_P / d_log_r is negative
+                penalty = softplus(-k * raw_slope_P) / k
 
-            inc_violation = pm.math.maximum(0, -log_M_slope)
+                v1 = pm.math.where(tvalid_1, penalty, 0.0)
 
-            v2 = pm.math.where(tvalid_2, inc_violation ** 2, 0.0)
+                pm.Potential("force_positive_mass", - pm.math.sum(v1))  # Penalizes when - d_log_P / d_log_r is negative
 
-            pm.Potential("force_increasing_mass", -5 * pm.math.sum(v2)) # Penalizes when d_log_M / d_log_r is negative
+            if force_increasing_mass:
 
-        if force_convective_stability:
+                k = 10
 
-            tvalid_0 = (rout_m > rmin_kpc)
+                penalty = softplus(-k * log_M_slope) / k
 
-            tvalid_1 = tvalid_0[1:] & tvalid_0[:-1]
+                v2 = pm.math.where(tvalid_2, penalty, 0.0)
 
-            log_d = pm.math.log(dens_m)
+                pm.Potential("force_increasing_mass", - pm.math.sum(v2))  # Penalizes when d_log_M / d_log_r is negative
 
-            log_t = pm.math.log(p3d) - log_d
+            if force_convective_stability:
 
-            log_K = log_t - (2.0/3.0) * log_d
+                k = 10
 
-            log_r = pm.math.log(rout_m)
+                penalty = softplus(-k * slope_K) / k
 
-            d_log_r = log_r[1:] - log_r[:-1]
+                v0 = pm.math.where(tvalid_1, penalty, 0.0)
 
-            d_log_K = log_K[1:] - log_K[:-1]
-
-            slope_K = d_log_K / d_log_r
-
-            violation = pm.math.maximum(0, -slope_K)
-
-            v0 = pm.math.where(tvalid_1, violation ** 2, 0.0)
-
-            pm.Potential("force_convective_stability", -10 * pm.math.sum(v0))  # Penalizes when - d_log_K / d_log_r is negative
+                pm.Potential("force_convective_stability", - pm.math.sum(v0))  # Penalizes when - d_log_K / d_log_r is negative
 
         # Density Likelihood
         if fit_bkg:
