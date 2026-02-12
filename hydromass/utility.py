@@ -98,7 +98,7 @@ def sb_utils(Mhyd, fit_bkg = False, rmin=None, rmax=None, bkglim=None, back=None
 
     vx = MyDeprojVol(rin_m / Mhyd.amin2kpc, rout_m / Mhyd.amin2kpc)
 
-    vol = vx.deproj_vol().T
+    volmat = vx.deproj_vol().T
 
     Mhyd.cf_prof = None
 
@@ -133,13 +133,13 @@ def sb_utils(Mhyd, fit_bkg = False, rmin=None, rmax=None, bkglim=None, back=None
 
         if Mhyd.spec_data.psfmat is not None:
 
-            mat1 = np.dot(Mhyd.spec_data.psfmat.T, sum_mat)
-
-            proj_mat = np.dot(mat1, vol)
+            psfmat = Mhyd.spec_data.psfmat
 
         else:
 
-            proj_mat = np.dot(sum_mat, vol)
+            psfmat = np.eye(len(Mhyd.spec_data.temp_x))
+
+        psfmat_sum_mat = np.dot(psfmat, sum_mat)
 
     if fit_bkg:
 
@@ -195,8 +195,8 @@ def sb_utils(Mhyd, fit_bkg = False, rmin=None, rmax=None, bkglim=None, back=None
 
     nbin = len(sb)
 
-    return (testval, testbkg, npt, bkgcounts, counts, sb, esb, valid, cf, rin_m, rout_m, rref_m, proj_mat, index_sz, ntm, rad,
-            rmin, rmax, vol, nbin)
+    return (testval, testbkg, npt, bkgcounts, counts, sb, esb, valid, cf, rin_m, rout_m, rref_m, psfmat_sum_mat, volmat, index_sz, ntm, rad,
+            rmin, rmax, nbin)
 
 
 

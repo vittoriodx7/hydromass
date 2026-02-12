@@ -201,13 +201,13 @@ def kt_forw_from_samples(Mhyd, Forward, nmore=5):
 
     if Mhyd.spec_data.psfmat is not None:
 
-        mat1 = np.dot(Mhyd.spec_data.psfmat.T, sum_mat)
-
-        proj_mat = np.dot(mat1, vol_x)
+        psfmat = Mhyd.spec_data.psfmat
 
     else:
 
-        proj_mat = np.dot(sum_mat, vol_x)
+        psfmat = np.eye(len(Mhyd.spec_data.temp_x))
+
+    psfmat_sum_mat = np.dot(psfmat, sum_mat)
 
     npx = len(Mhyd.spec_data.rref_x)
 
@@ -221,9 +221,9 @@ def kt_forw_from_samples(Mhyd, Forward, nmore=5):
     ei = dens_m ** 2 * t3d ** (-0.75)
 
     # Temperature projection
-    flux = np.dot(proj_mat, ei)
+    flux = np.dot(vol_x, ei)
 
-    tproj = np.dot(proj_mat, t3d * ei) / flux
+    tproj = np.dot(psfmat_sum_mat, np.dot(vol_x, t3d * ei) / flux)
 
     tmed, tlo, thi = np.percentile(tproj, [50., 50. - 68.3 / 2., 50. + 68.3 / 2.], axis=1)
 
@@ -664,7 +664,7 @@ class Forward:
 
             limits = np.empty((self.npar, 2))
 
-            limits[0] = [1e-4, 1.]
+            limits[0] = [1e-5, 1.]
 
             limits[1] = [0.1/2000., 6./500.]
 
@@ -672,7 +672,7 @@ class Forward:
 
             limits[3] = [0.5, 2.5]
 
-            limits[4] = [2., 10.]
+            limits[4] = [1., 10.]
 
         else:
 
@@ -894,9 +894,9 @@ def Run_Forward_PyMC3(Mhyd,Forward, bkglim=None,nmcmc=1000,fit_bkg=False,back=No
     #
     #     Kdens_m = calc_density_operator(rout_m / Mhyd.amin2kpc, pardens, Mhyd.amin2kpc, withbkg=False)
 
-    testval, testbkg, npt, bkgcounts, counts, sb, esb, valid, cf, rin_m, rout_m, rref_m, proj_mat, index_sz, ntm, rad, rmin, rmax, vol, nbin = (
-        sb_utils(Mhyd, fit_bkg = fit_bkg, rmin = rmin, rmax = rmax, bkglim = bkglim, back = back, nrc = nrc,
-                                                 nbetas = nbetas, min_beta = min_beta, nmore = nmore))
+    (testval, testbkg, npt, bkgcounts, counts, sb, esb, valid, cf, rin_m, rout_m, rref_m, psfmat_sum_mat, volmat, index_sz, ntm, rad, rmin, rmax,
+     nbin) = sb_utils(Mhyd, fit_bkg = fit_bkg, rmin = rmin, rmax = rmax, bkglim = bkglim, back = back, nrc = nrc,
+                      nbetas = nbetas, min_beta = min_beta, nmore = nmore)
 
     rmin_kpc = rmin * Mhyd.amin2kpc
 
@@ -1055,9 +1055,9 @@ def Run_Forward_PyMC3(Mhyd,Forward, bkglim=None,nmcmc=1000,fit_bkg=False,back=No
             ei = dens_m ** 2 * t3d ** (-0.75)
 
             # Temperature projection
-            flux = pm.math.dot(proj_mat, ei)
+            flux = pm.math.dot(volmat, ei)
 
-            tproj = pm.math.dot(proj_mat, t3d * ei) / flux
+            tproj = pm.math.dot(psfmat_sum_mat, pm.math.dot(volmat, t3d * ei) / flux)
 
             valspec = np.where(np.logical_and(Mhyd.spec_data.rref_x_am >= rmin, Mhyd.spec_data.rref_x_am <= rmax))
 

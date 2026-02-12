@@ -4,11 +4,13 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="5521cb6d-2b2a-4738-9850-2cb9dfed795b" name="Changes" comment="Added force_convective_stability and force_positive_mass options. They respectively force dlogK/dlogR &gt; 0, M&gt;0 and dlogM/dlogR &lt; 0. First one serves to have increasing entropy, second one to have positive mass, third to have increasing mass">
+    <list default="true" id="5521cb6d-2b2a-4738-9850-2cb9dfed795b" name="Changes" comment="Improved stability of convective stability, positive mass, increasing mass with &#10;def softplus(x):&#10;    return pm.math.log(1+pm.math.exp(x))">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/hydromass/forward.py" beforeDir="false" afterPath="$PROJECT_DIR$/hydromass/forward.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/hydromass/mhyd.py" beforeDir="false" afterPath="$PROJECT_DIR$/hydromass/mhyd.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/hydromass/nonparametric.py" beforeDir="false" afterPath="$PROJECT_DIR$/hydromass/nonparametric.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/hydromass/plots.py" beforeDir="false" afterPath="$PROJECT_DIR$/hydromass/plots.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/hydromass/utility.py" beforeDir="false" afterPath="$PROJECT_DIR$/hydromass/utility.py" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -65,7 +67,7 @@
   <component name="SharedIndexes">
     <attachedChunks>
       <set>
-        <option value="bundled-python-sdk-3944b0c99280-6d6dccd035ac-com.jetbrains.pycharm.pro.sharedIndexes.bundled-PY-253.30387.127" />
+        <option value="bundled-python-sdk-4762d8aabb82-6d6dccd035ac-com.jetbrains.pycharm.pro.sharedIndexes.bundled-PY-253.30387.173" />
       </set>
     </attachedChunks>
   </component>
@@ -437,7 +439,15 @@
       <option name="project" value="LOCAL" />
       <updated>1770735716595</updated>
     </task>
-    <option name="localTasksCounter" value="46" />
+    <task id="LOCAL-00046" summary="Improved stability of convective stability, positive mass, increasing mass with &#10;def softplus(x):&#10;    return pm.math.log(1+pm.math.exp(x))">
+      <option name="closed" value="true" />
+      <created>1770796766405</created>
+      <option name="number" value="00046" />
+      <option name="presentableId" value="LOCAL-00046" />
+      <option name="project" value="LOCAL" />
+      <updated>1770796766405</updated>
+    </task>
+    <option name="localTasksCounter" value="47" />
     <servers />
   </component>
   <component name="Vcs.Log.Tabs.Properties">
@@ -452,7 +462,6 @@
     </option>
   </component>
   <component name="VcsManagerConfiguration">
-    <MESSAGE value="Added __all__" />
     <MESSAGE value="Added rmax_sb of 4 Mpc" />
     <MESSAGE value="Fixed imports" />
     <MESSAGE value="Fixed bug in forward.py" />
@@ -477,6 +486,7 @@
     <MESSAGE value="Fixed NP to use utility" />
     <MESSAGE value="Added force_convective_stability and force_positive_mass options. They respectively force dlogK/dlogR &gt; 0 and dlogP/dlogR &lt; 0. First one serves to have increasing entropy, second one to have increasing mass" />
     <MESSAGE value="Added force_convective_stability and force_positive_mass options. They respectively force dlogK/dlogR &gt; 0, M&gt;0 and dlogM/dlogR &lt; 0. First one serves to have increasing entropy, second one to have positive mass, third to have increasing mass" />
-    <option name="LAST_COMMIT_MESSAGE" value="Added force_convective_stability and force_positive_mass options. They respectively force dlogK/dlogR &gt; 0, M&gt;0 and dlogM/dlogR &lt; 0. First one serves to have increasing entropy, second one to have positive mass, third to have increasing mass" />
+    <MESSAGE value="Improved stability of convective stability, positive mass, increasing mass with &#10;def softplus(x):&#10;    return pm.math.log(1+pm.math.exp(x))" />
+    <option name="LAST_COMMIT_MESSAGE" value="Improved stability of convective stability, positive mass, increasing mass with &#10;def softplus(x):&#10;    return pm.math.log(1+pm.math.exp(x))" />
   </component>
 </project>
