@@ -304,7 +304,7 @@ def Run_Mhyd_PyMC3(Mhyd,model,bkglim=None,nmcmc=1000,fit_bkg=False,back=None,
     #
     #     Kdens_m = calc_density_operator(rref_m / Mhyd.amin2kpc, pardens, Mhyd.amin2kpc, withbkg=False)
 
-    (testval, testbkg, npt, bkgcounts, counts, sb, esb, valid, cf, rin_m, rout_m, rref_m, psfmat_sum_mat, volmat, index_sz, ntm, rad, rmin, rmax,
+    (testval, testbkg, npt, bkgcounts, counts, sb, esb, valid, cf, rin_m, rout_m, rref_m, proj_mat, volmat, index_sz, ntm, rad, rmin, rmax,
      nbin) = sb_utils(Mhyd, fit_bkg = fit_bkg, rmin = rmin, rmax = rmax, bkglim = bkglim, back = back, nrc = nrc,
                       nbetas = nbetas, min_beta = min_beta, nmore = nmore)
 
@@ -603,9 +603,9 @@ def Run_Mhyd_PyMC3(Mhyd,model,bkglim=None,nmcmc=1000,fit_bkg=False,back=None,
                 ei = dens_m ** 2 * t3d ** (-0.75)
 
                 # Temperature projection
-                flux = pm.math.dot(volmat, ei)
+                flux = pm.math.dot(proj_mat, ei)
 
-                tproj = pm.math.dot(psfmat_sum_mat, pm.math.dot(volmat, t3d * ei) / flux)
+                tproj = pm.math.dot(proj_mat, t3d * ei) / flux
 
                 rmin_spec = 0.
                 rmax_spec = np.max(Mhyd.spec_data.rout_x_am)

@@ -303,7 +303,7 @@ def kt_GP_from_samples(Mhyd, nmore=5):
 
         psfmat = np.eye(len(Mhyd.spec_data.temp_x))
 
-    psfmat_sum_mat = np.dot(psfmat, sum_mat)
+    proj_mat = np.dot(np.dot(psfmat, sum_mat), vol_x)
 
     nvalm = len(rin_m)
 
@@ -329,9 +329,9 @@ def kt_GP_from_samples(Mhyd, nmore=5):
     ei = dens_m ** 2 * t3d ** (-0.75)
 
     # Temperature projection
-    flux = np.dot(vol_x, ei)
+    flux = np.dot(proj_mat, ei)
 
-    tproj = np.dot(psfmat_sum_mat, np.dot(vol_x, t3d * ei) / flux)
+    tproj = np.dot(proj_mat, t3d * ei) / flux
 
     tmed, tlo, thi = np.percentile(tproj, [50., 50. - 68.3 / 2., 50. + 68.3 / 2.], axis=1)
 
@@ -970,7 +970,7 @@ def Run_NonParametric_PyMC3(Mhyd, bkglim=None, nmcmc=1000, fit_bkg=False, back=N
         #
         #     Kdens_grad = calc_grad_operator(rout_m / Mhyd.amin2kpc, pardens, Mhyd.amin2kpc, withbkg=False)
 
-    (testval, testbkg, npt, bkgcounts, counts, sb, esb, valid, cf, rin_m, rout_m, rref_m, psfmat_sum_mat, volmat, index_sz, ntm, rad, rmin, rmax,
+    (testval, testbkg, npt, bkgcounts, counts, sb, esb, valid, cf, rin_m, rout_m, rref_m, proj_mat, volmat, index_sz, ntm, rad, rmin, rmax,
      nbin) = sb_utils(Mhyd, fit_bkg = fit_bkg, rmin = rmin, rmax = rmax, bkglim = bkglim, back = back, nrc = nrc,
                       nbetas = nbetas, min_beta = min_beta, nmore = nmore)
 
@@ -1144,9 +1144,9 @@ def Run_NonParametric_PyMC3(Mhyd, bkglim=None, nmcmc=1000, fit_bkg=False, back=N
             ei = dens_m ** 2 * t3d ** (-0.75)
 
             # Temperature projection
-            flux = pm.math.dot(volmat, ei)
+            flux = pm.math.dot(proj_mat, ei)
 
-            tproj = pm.math.dot(psfmat_sum_mat, pm.math.dot(volmat, t3d * ei) / flux)
+            tproj = pm.math.dot(proj_mat, t3d * ei) / flux
 
             valspec = np.where(np.logical_and(Mhyd.spec_data.rref_x_am >= rmin, Mhyd.spec_data.rref_x_am <= rmax))
 

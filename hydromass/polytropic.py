@@ -269,7 +269,7 @@ def kt_poly_from_samples(Mhyd, Polytropic, nmore=5):
 
     if Mhyd.spec_data.psfmat is not None:
 
-        mat1 = np.dot(Mhyd.spec_data.psfmat.T, sum_mat)
+        mat1 = np.dot(Mhyd.spec_data.psfmat, sum_mat)
 
         proj_mat = np.dot(mat1, vol_x)
 
@@ -884,7 +884,7 @@ def Run_Polytropic_PyMC3(Mhyd, Polytropic, bkglim=None,nmcmc=1000,fit_bkg=False,
 
         if Mhyd.spec_data.psfmat is not None:
 
-            mat1 = np.dot(Mhyd.spec_data.psfmat.T, sum_mat)
+            mat1 = np.dot(Mhyd.spec_data.psfmat, sum_mat)
 
             proj_mat = np.dot(mat1, vol)
 

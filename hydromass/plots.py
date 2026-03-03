@@ -651,7 +651,7 @@ def kt_from_samples(Mhyd, model, nmore=5):
 
         psfmat = np.eye(len(Mhyd.spec_data.temp_x))
 
-    psfmat_sum_mat = np.dot(psfmat, sum_mat)
+    proj_mat = np.dot(np.dot(psfmat, sum_mat), vol_x)
 
     npx = len(Mhyd.spec_data.rref_x)
 
@@ -663,12 +663,12 @@ def kt_from_samples(Mhyd, model, nmore=5):
     ei = dens_m ** 2 * t3d ** (-0.75)
 
     # Temperature projection
-    flux = np.dot(vol_x, ei)
+    flux = np.dot(proj_mat, ei)
 
-    tproj = np.dot(psfmat_sum_mat, np.dot(vol_x, t3d * ei) / flux)
+    tproj = np.dot(proj_mat, t3d * ei) / flux
 
-    # np.savez('proj', rout_m=rout_m, rin_m=rin_m, dens_m=dens_m, t3d=t3d, proj_mat=proj_mat, ei=ei, flux=flux, tproj=tproj, vol_x=vol_x,
-    #          sum_mat=sum_mat, psfmat=Mhyd.spec_data.psfmat, rref_x=Mhyd.spec_data.rref_x)
+    np.savez('proj', rout_m=rout_m, rin_m=rin_m, dens_m=dens_m, t3d=t3d, ei=ei, flux=flux, tproj=tproj, vol_x=vol_x,
+             sum_mat=sum_mat, psfmat=Mhyd.spec_data.psfmat, rref_x=Mhyd.spec_data.rref_x)
 
     tmed, tlo, thi = np.percentile(tproj, [50., 50. - 68.3 / 2., 50. + 68.3 / 2.], axis=1)
 

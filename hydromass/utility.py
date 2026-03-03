@@ -139,7 +139,7 @@ def sb_utils(Mhyd, fit_bkg = False, rmin=None, rmax=None, bkglim=None, back=None
 
             psfmat = np.eye(len(Mhyd.spec_data.temp_x))
 
-        psfmat_sum_mat = np.dot(psfmat, sum_mat)
+        proj_mat = np.dot(np.dot(psfmat, sum_mat), volmat)
 
     if fit_bkg:
 
@@ -195,7 +195,9 @@ def sb_utils(Mhyd, fit_bkg = False, rmin=None, rmax=None, bkglim=None, back=None
 
     nbin = len(sb)
 
-    return (testval, testbkg, npt, bkgcounts, counts, sb, esb, valid, cf, rin_m, rout_m, rref_m, psfmat_sum_mat, volmat, index_sz, ntm, rad,
+
+
+    return (testval, testbkg, npt, bkgcounts, counts, sb, esb, valid, cf, rin_m, rout_m, rref_m, proj_mat, volmat, index_sz, ntm, rad,
             rmin, rmax, nbin)
 
 
