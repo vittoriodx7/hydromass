@@ -6,7 +6,7 @@ import matplotlib.pyplot as plt
 from .deproject import MyDeprojVol, calc_density_operator, list_params, calc_linear_operator, calc_sb_operator, list_params_density
 from .plots import rads_more, get_coolfunc
 from .constants import cgskpc, cgsMpc, cgsG, cgsamu, kev2erg, Msun, const_G_Msun_kpc, year, y_prefactor
-from .utility import sb_utils
+from .utility import sb_utils, dens_utils
 
 __all__ = ['gnfw_pm', 'gnfw_np', 'der_lnP_np', 'kt_forw_from_samples', 'P_forw_from_samples', 'mass_forw_from_samples', 'prof_forw_hires',
            'Forward', 'Run_Forward_PyMC3']
@@ -276,7 +276,7 @@ def P_forw_from_samples(Mhyd, Forward, nmore=5):
     return pmed, plo, phi
 
 
-def mass_forw_from_samples(Mhyd, Forward, rin=None, rout=None, npt=200, plot=False, nmore=5, mstar=None):
+def mass_forw_from_samples(Mhyd, Forward, plot=False, mstar=None, **kwargs):
     '''
     Compute the best-fit forward mass model and its 1-sigma error envelope from a loaded Forward run. 
 
@@ -294,55 +294,7 @@ def mass_forw_from_samples(Mhyd, Forward, rin=None, rout=None, npt=200, plot=Fal
     :rtype: dict(11xnpt)
     '''
 
-    nsamp = len(Mhyd.samples)
-
-    rin_m, rout_m, index_x, index_sz, sum_mat, ntm = rads_more(Mhyd, nmore=nmore)
-
-    if rin is None:
-        rin = np.min((rin_m+rout_m)/2.)
-
-        if rin == 0:
-            rin = 1.
-
-    if rout is None:
-        rout = np.max(rout_m)
-
-    bins = np.logspace(np.log10(rin), np.log10(rout), npt + 1)
-
-    if rin == 1.:
-        bins[0] = 0.
-
-    rin_m = bins[:npt]
-
-    rout_m = bins[1:]
-
-    rref_m = (rin_m + rout_m) / 2.
-
-    nvalm = len(rin_m)
-
-    if Mhyd.cf_prof is not None:
-
-        rref_m = (rin_m + rout_m) / 2.
-
-        rad = Mhyd.sbprof.bins
-
-        tcf = np.interp(rref_m, rad * Mhyd.amin2kpc, Mhyd.ccf)
-
-        cf_prof = np.repeat(tcf, nsamp).reshape(nvalm, nsamp)
-
-    else:
-
-        cf_prof = Mhyd.ccf
-
-    if Mhyd.fit_bkg:
-
-        Kdens_m = calc_density_operator(rref_m / Mhyd.amin2kpc, Mhyd.pardens, Mhyd.amin2kpc)
-
-    else:
-
-        Kdens_m = calc_density_operator(rref_m / Mhyd.amin2kpc, Mhyd.pardens, Mhyd.amin2kpc, withbkg=False)
-
-    dens_m = np.sqrt(np.dot(Kdens_m, np.exp(Mhyd.samples.T)) / cf_prof * Mhyd.transf)
+    bins, rin_m, rout_m, dens_m, mgas, nvalm, nsamp, Kdens_grad, cf_prof = dens_utils(Mhyd, **kwargs)
 
     p3d = Forward.func_np(rout_m, Mhyd.samppar)
 
@@ -353,19 +305,6 @@ def mass_forw_from_samples(Mhyd, Forward, rin=None, rout=None, npt=200, plot=Fal
     mass = - der_lnP * rout_mul / (dens_m * cgsG * cgsamu * Mhyd.mup) * p3d * kev2erg / Msun
 
     mmed, mlo, mhi = np.percentile(mass, [50., 50. - 68.3 / 2., 50. + 68.3 / 2.], axis=1)
-
-    # Matrix containing integration volumes
-    volmat = np.repeat(4. / 3. * np.pi * (rout_m ** 3 - rin_m ** 3), nsamp).reshape(nvalm, nsamp)
-
-    # Compute Mgas profile as cumulative sum over the volume
-
-    nhconv = cgsamu * Mhyd.mu_e * cgskpc ** 3 / Msun  # Msun/kpc^3
-
-    ones_mat = np.ones((nvalm, nvalm))
-
-    cs_mat = np.tril(ones_mat)
-
-    mgas = np.dot(cs_mat, dens_m * nhconv * volmat)
 
     mg, mgl, mgh = np.percentile(mgas, [50., 50. - 68.3 / 2., 50. + 68.3 / 2.], axis=1)
 
@@ -398,6 +337,7 @@ def mass_forw_from_samples(Mhyd, Forward, rin=None, rout=None, npt=200, plot=Fal
     dict = {
         "R_IN": rin_m,
         "R_OUT": rout_m,
+        "R_REF": (rin_m + rout_m) / 2,
         "MASS": mmed,
         "MASS_LO": mlo,
         "MASS_HI": mhi,
@@ -708,7 +648,7 @@ class Forward:
 
 def Run_Forward_PyMC3(Mhyd,Forward, bkglim=None,nmcmc=1000,fit_bkg=False,back=None,
                    samplefile=None,nrc=None,nbetas=6,min_beta=0.6, nmore=5,
-                   tune=500, find_map=True, rmin=0., rmax=None,
+                   tune=500, find_map=True, rmin=0., rmax=None, fit_eta=False, do_ppc=True,
                    force_positive_mass = False, force_convective_stability = False, force_increasing_mass=False):
     """
     Set up parametric forward model fit and optimize with PyMC3. The routine takes a parametric function for the 3D gas pressure profile as input and optimizes jointly for the gas density and pressure profiles. The mass profile is then computed point by point using the analytic derivative of the model pressure profile:
@@ -751,6 +691,8 @@ def Run_Forward_PyMC3(Mhyd,Forward, bkglim=None,nmcmc=1000,fit_bkg=False,back=No
     :type rmin: float
     :param rmax: Maximum limiting radius (in arcmin) of the active region for the surface brightness. If rmax=None, no maximum radius is applied. Defaults to None.
     :type rmax: float
+    :param fit_eta: Fit for $\\eta_T = P_X/P_{SZ}$ according to the definition of Kozmanyan et al. 2019. Defaults to False.
+    :type fit_eta: bool
     """
 
 
@@ -966,6 +908,12 @@ def Run_Forward_PyMC3(Mhyd,Forward, bkglim=None,nmcmc=1000,fit_bkg=False,back=No
 
         pmod = pm.math.stack(allpmod, axis=0)
 
+        if fit_eta:
+            Mhyd.logger.info("pm.Uniform('eta', lower=0.2, upper=5)")
+            eta = pm.Uniform('eta', lower=0.2, upper=5)
+        else:
+            eta = 1
+
         dens_m = pm.math.sqrt(pm.math.dot(Mhyd.Kdens_m, al) / cf * Mhyd.transf)  # electron density in cm-3
 
         p3d = Forward.func_pm(rout_m, *pmod)
@@ -1069,6 +1017,9 @@ def Run_Forward_PyMC3(Mhyd,Forward, bkglim=None,nmcmc=1000,fit_bkg=False,back=No
             if Mhyd.sz_data.pres_sz is not None:
                 pfit = p3d[index_sz]
 
+                if fit_eta:
+                    pfit = pfit * eta  # P_SZ = P_X * eta
+
                 P_obs = pm.MvNormal('P', mu=pfit, observed=Mhyd.sz_data.pres_sz, cov=Mhyd.sz_data.covmat_sz)  # SZ pressure likelihood
 
             elif Mhyd.sz_data.y_sz is not None: # Fitting the Compton y parameter
@@ -1151,21 +1102,23 @@ def Run_Forward_PyMC3(Mhyd,Forward, bkglim=None,nmcmc=1000,fit_bkg=False,back=No
 
                 trace = pmjax.sample_numpyro_nuts(nmcmc, tune=tune, target_accept=0.9)
 
-        Mhyd.ppc_sb = pm.sample_posterior_predictive(trace, var_names=['sb'])
+        if do_ppc:
 
-        if Mhyd.spec_data is not None:
+            Mhyd.ppc_sb = pm.sample_posterior_predictive(trace, var_names=['sb'])
 
-            Mhyd.ppc_kt = pm.sample_posterior_predictive(trace, var_names=['kt'])
+            if Mhyd.spec_data is not None:
 
-        if Mhyd.sz_data is not None:
+                Mhyd.ppc_kt = pm.sample_posterior_predictive(trace, var_names=['kt'])
 
-            if Mhyd.sz_data.pres_sz is not None: # Fitting the pressure
+            if Mhyd.sz_data is not None:
 
-                Mhyd.ppc_sz = pm.sample_posterior_predictive(trace, var_names=['P'])
+                if Mhyd.sz_data.pres_sz is not None: # Fitting the pressure
 
-            elif Mhyd.sz_data.y_sz is not None: # Fitting the Compton y parameter
+                    Mhyd.ppc_sz = pm.sample_posterior_predictive(trace, var_names=['P'])
 
-                Mhyd.ppc_sz = pm.sample_posterior_predictive(trace, var_names=['Y'])
+                elif Mhyd.sz_data.y_sz is not None: # Fitting the Compton y parameter
+
+                    Mhyd.ppc_sz = pm.sample_posterior_predictive(trace, var_names=['Y'])
 
     Mhyd.logger.info('Done.')
 
@@ -1258,6 +1211,10 @@ def Run_Forward_PyMC3(Mhyd,Forward, bkglim=None,nmcmc=1000,fit_bkg=False,back=No
         else:
 
             samppar[:, i] = np.array(trace.posterior[name]).flatten()
+
+    if fit_eta:
+        eta = np.array(trace.posterior['eta']).flatten()
+        Mhyd.eta = eta
 
     Mhyd.samppar = samppar
 

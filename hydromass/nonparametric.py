@@ -9,7 +9,7 @@ from astropy.cosmology.units import redshift
 from .constants import cgskpc, cgsG, kev2erg, Msun, cgsamu, const_G_Msun_kpc, year
 from .deproject import MyDeprojVol, calc_density_operator, calc_grad_operator, list_params_density, list_params, calc_linear_operator, calc_sb_operator
 from .plots import rads_more, get_coolfunc, estimate_T0
-from .utility import sb_utils
+from .utility import sb_utils, dens_utils
 
 __all__ = ['calc_gp_operator', 'calc_gp_operator_lognormal', 'calc_gp_grad_operator', 'calc_gp_grad_operator_lognormal', 'kt_GP_from_samples',
            'P_GP_from_samples', 'mass_GP_from_samples', 'prof_GP_hires', 'Run_NonParametric_PyMC3']
@@ -403,7 +403,7 @@ def P_GP_from_samples(Mhyd, nmore=5):
     return pmed, plo, phi
 
 
-def mass_GP_from_samples(Mhyd, rin=None, rout=None, npt=200, plot=False):
+def mass_GP_from_samples(Mhyd, plot=False, **kwargs):
     '''
     Compute the hydrostatic mass profile from an existing non-parametric reconstruction run. The gradient of the basis functions for the temperature and the density are computed analytically and the best-fit coefficients are used to determine the posterior distributions of hydrostatic mass,
 
@@ -425,58 +425,7 @@ def mass_GP_from_samples(Mhyd, rin=None, rout=None, npt=200, plot=False):
     :rtype: dict(11xnpt)
     '''
 
-    nsamp = len(Mhyd.samples)
-
-    rin_m, rout_m, index_x, index_sz, sum_mat, ntm = rads_more(Mhyd, nmore=Mhyd.nmore)
-
-    if rin is None:
-        rin = np.min((rin_m+rout_m)/2.)
-
-        if rin == 0:
-            rin = 1.
-
-    if rout is None:
-        rout = np.max(rout_m)
-
-    bins = np.linspace(np.sqrt(rin), np.sqrt(rout), npt + 1)
-
-    bins = bins ** 2
-
-    rin_m = bins[:npt]
-
-    rout_m = bins[1:]
-
-    rref_m = (rin_m + rout_m) / 2.
-
-    nvalm = len(rin_m)
-
-    if Mhyd.cf_prof is not None:
-
-        rref_m = (rin_m + rout_m) / 2.
-
-        rad = Mhyd.sbprof.bins
-
-        tcf = np.interp(rref_m, rad * Mhyd.amin2kpc, Mhyd.ccf)
-
-        cf_prof = np.repeat(tcf, nsamp).reshape(nvalm, nsamp)
-
-    else:
-
-        cf_prof = Mhyd.ccf
-
-    if Mhyd.fit_bkg:
-
-        Kdens_m = calc_density_operator(rout_m / Mhyd.amin2kpc, Mhyd.pardens, Mhyd.amin2kpc)
-
-        Kdens_grad = calc_grad_operator(rout_m / Mhyd.amin2kpc, Mhyd.pardens, Mhyd.amin2kpc)
-
-    else:
-
-        Kdens_m = calc_density_operator(rout_m / Mhyd.amin2kpc, Mhyd.pardens, Mhyd.amin2kpc, withbkg=False)
-
-        Kdens_grad = calc_grad_operator(rout_m / Mhyd.amin2kpc, Mhyd.pardens, Mhyd.amin2kpc, withbkg=False)
-
-    dens_m = np.sqrt(np.dot(Kdens_m, np.exp(Mhyd.samples.T)) / cf_prof * Mhyd.transf)
+    bins, rin_m, rout_m, dens_m, mgas, nvalm, nsamp, Kdens_grad, cf_prof = dens_utils(Mhyd, **kwargs)
 
     grad_dens = np.dot(Kdens_grad, np.exp(Mhyd.samples.T)) / 2. / dens_m ** 2 / cf_prof * Mhyd.transf
 
@@ -510,18 +459,18 @@ def mass_GP_from_samples(Mhyd, rin=None, rout=None, npt=200, plot=False):
 
     mmed, mlo, mhi = np.percentile(mass, [50., 50. - 68.3 / 2., 50. + 68.3 / 2.], axis=1)
 
-    # Matrix containing integration volumes
-    volmat = np.repeat(4. / 3. * np.pi * (rout_m ** 3 - rin_m ** 3), nsamp).reshape(nvalm, nsamp)
-
-    # Compute Mgas profile as cumulative sum over the volume
-
-    nhconv = cgsamu * Mhyd.mu_e * cgskpc ** 3 / Msun  # Msun/kpc^3
-
-    ones_mat = np.ones((nvalm, nvalm))
-
-    cs_mat = np.tril(ones_mat)
-
-    mgas = np.dot(cs_mat, dens_m * nhconv * volmat)
+    # # Matrix containing integration volumes
+    # volmat = np.repeat(4. / 3. * np.pi * (rout_m ** 3 - rin_m ** 3), nsamp).reshape(nvalm, nsamp)
+    #
+    # # Compute Mgas profile as cumulative sum over the volume
+    #
+    # nhconv = cgsamu * Mhyd.mu_e * cgskpc ** 3 / Msun  # Msun/kpc^3
+    #
+    # ones_mat = np.ones((nvalm, nvalm))
+    #
+    # cs_mat = np.tril(ones_mat)
+    #
+    # mgas = np.dot(cs_mat, dens_m * nhconv * volmat)
 
     mg, mgl, mgh = np.percentile(mgas, [50., 50. - 68.3 / 2., 50. + 68.3 / 2.], axis=1)
 
