@@ -253,7 +253,7 @@ def sb_utils(Mhyd, fit_bkg = False, rmin=None, rmax=None, bkglim=None, back=None
 
             Mhyd.logger.info('Interpolating conversion factor profile onto the radial grid')
 
-            cf = np.interp(rout_m, rad * Mhyd.amin2kpc, Mhyd.ccf)
+            cf = np.interp(rref_m, rad * Mhyd.amin2kpc, Mhyd.ccf)
 
             Mhyd.cf_prof = cf
 
@@ -334,6 +334,16 @@ def sb_utils(Mhyd, fit_bkg = False, rmin=None, rmax=None, bkglim=None, back=None
 
 
 def dens_utils(Mhyd, rin=None, rout=None, npt=200, nmore=5):
+    '''
+    Computes density and gas mass profiles from samples. This method is common to Mhyd, Forw, and NP.
+
+    :param Mhyd:
+    :param rin:
+    :param rout:
+    :param npt:
+    :param nmore:
+    :return:
+    '''
     nsamp = len(Mhyd.samples)
 
     rin_m, rout_m, index_x, index_sz, sum_mat, ntm = rads_more(Mhyd, nmore=nmore)
@@ -363,8 +373,6 @@ def dens_utils(Mhyd, rin=None, rout=None, npt=200, nmore=5):
     nvalm = len(rin_m)
 
     if Mhyd.cf_prof is not None:
-
-        rref_m = (rin_m + rout_m) / 2.
 
         rad = Mhyd.sbprof.bins
 

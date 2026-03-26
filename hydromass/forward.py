@@ -195,6 +195,8 @@ def kt_forw_from_samples(Mhyd, Forward, nmore=5):
 
         cf_prof = Mhyd.ccf
 
+    dens_m = np.sqrt(np.dot(Mhyd.Kdens_m, np.exp(Mhyd.samples.T)) / cf_prof * Mhyd.transf)
+
     vx = MyDeprojVol(rin_m / Mhyd.amin2kpc, rout_m / Mhyd.amin2kpc)
 
     vol_x = vx.deproj_vol().T
@@ -210,8 +212,6 @@ def kt_forw_from_samples(Mhyd, Forward, nmore=5):
     proj_mat = np.dot(np.dot(psfmat, sum_mat), vol_x)
 
     npx = len(Mhyd.spec_data.rref_x)
-
-    dens_m = np.sqrt(np.dot(Mhyd.Kdens_m, np.exp(Mhyd.samples.T)) / cf_prof * Mhyd.transf)
 
     p3d = Forward.func_np(rout_m, Mhyd.samppar)
 

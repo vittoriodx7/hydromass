@@ -65,7 +65,7 @@ def mgas_delta(rdelta, coefs, Mhyd, fit_bkg=False, rout_m=None):
 
     if Mhyd.cf_prof is not None and rout_m is not None:
 
-        cfp = np.interp(rout, rout_m, Mhyd.cf_prof)
+        cfp = np.interp(r_ref, rout_m, Mhyd.cf_prof)
 
     else:
 
@@ -117,7 +117,7 @@ def mbar_overdens(rmax, coefs, Mhyd, fit_bkg=False, rout_m=None):
 
     if Mhyd.cf_prof is not None and rout_m is not None:
 
-        cfp = np.interp(rout, rout_m, Mhyd.cf_prof)
+        cfp = np.interp(r_ref, rout_m, Mhyd.cf_prof)
 
     else:
 
