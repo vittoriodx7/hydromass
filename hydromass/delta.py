@@ -5,7 +5,7 @@ from scipy.optimize import minimize
 
 from .constants import cgskpc, Msun, cgsamu, cgsG, kev2erg
 from .deproject import calc_density_operator, calc_grad_operator, calc_sb_operator, MyDeprojVol
-from .plots import rads_more
+from .utility import rads_more
 
 __all__ = ['delta_func', 'mgas_delta', 'mbar_overdens', 'calc_rdelta_mdelta', 'calc_rdelta_mdelta_GP', 'calc_rdelta_mdelta_forward',
            'calc_rdelta_mdelta_forward', 'calc_rdelta_mdelta_polytropic', 'write_all_mdelta', 'write_all_mdelta_GP', 'write_covmat',

@@ -23,7 +23,7 @@ else:
 import pymc as pm
 import arviz as az
 
-from .plots import cumsum_mat, rads_more, estimate_P0, kt_from_samples, P_from_samples, mgas_pm
+from .plots import cumsum_mat, estimate_P0, kt_from_samples, P_from_samples, mgas_pm
 from .nonparametric import Run_NonParametric_PyMC3
 from .forward import Run_Forward_PyMC3
 from .deproject import (calc_density_operator, list_params, calc_linear_operator, calc_sb_operator, list_params_density, MyDeprojVol,
@@ -35,7 +35,7 @@ from .polytropic import Run_Polytropic_PyMC3
 from .mu import mean_molecular_weights
 from .save import SaveModel, SaveForward, SaveGP
 from .wl import WLmodel
-from .utility import sb_utils
+from .utility import sb_utils, rads_more
 
 __all__ = ['Run_Mhyd_PyMC3', 'Mhyd']
 
@@ -433,14 +433,14 @@ def Run_Mhyd_PyMC3(Mhyd,model,bkglim=None,nmcmc=1000,fit_bkg=False,back=None,
 
                 Mhyd.logger.info(f'Estimated value of P0: {P0_est}')
 
-                err_P0_est = P0_est # 1 in ln
+                err_P0_est = np.log(10) * P0_est #P0_est # 1 in ln
 
             logp0 = pm.TruncatedNormal('logp0', mu=np.log(P0_est), sigma=err_P0_est / P0_est,
-                                       lower=np.log(P0_est) - np.log(10),
-                                       upper=np.log(P0_est) + np.log(10))
+                                       lower=np.log(P0_est) - 2*np.log(10),
+                                       upper=np.log(P0_est) + 2*np.log(10))
 
-            Mhyd.logger.info(f"pm.TruncatedNormal('logp0', mu={np.log(P0_est)}, sigma={err_P0_est / P0_est}, "
-                  f"lower={np.log(P0_est) - np.log(10)}, upper={np.log(P0_est) + np.log(10)})")
+            Mhyd.logger.info(f"pm.TruncatedNormal('logp0', mu={np.log(P0_est)}, sigma={err_P0_est / P0_est}, " #+
+                  f"lower={np.log(P0_est) - 2*np.log(10)}, upper={np.log(P0_est) + 2*np.log(10)})")
 
             if pnt :
 
@@ -665,10 +665,10 @@ def Run_Mhyd_PyMC3(Mhyd,model,bkglim=None,nmcmc=1000,fit_bkg=False,back=None,
                         yfit = elongation_correction(y_num, (rin_m_p + rout_m_p)/2*cgskpc, index_sz, elongation).flatten()
 
                     elif fit_eta:
-                        yfit = y_num / eta
+                        yfit = y_num[index_sz] / eta
 
                     else:
-                        yfit = y_num
+                        yfit = y_num[index_sz]
 
                     if Mhyd.sz_data.psfmat is not None:
 
@@ -1313,7 +1313,7 @@ class Mhyd:
 
     def run_forward(self, forward=None, bkglim=None, nmcmc=1000, fit_bkg=False, back=None,
             samplefile=None, nrc=None, nbetas=6, min_beta=0.6, nmore=5, tune=500, find_map=True, rmin=0, rmax=None, force_positive_mass = False,
-                    force_convective_stability = False, force_increasing_mass = False):
+                    force_convective_stability = False, force_increasing_mass = False, fit_eta=False, do_ppc=True):
 
         '''
         Optimize a parametric forward fit to the gas pressure profile using the :func:`hydromass.forward.Run_Forward_PyMC3` function
@@ -1371,6 +1371,8 @@ class Mhyd:
                           find_map=find_map,
                           rmin=rmin,
                           rmax=rmax,
+                          fit_eta=fit_eta,
+                          do_ppc = do_ppc,
                           force_positive_mass = force_positive_mass,
                           force_convective_stability = force_convective_stability,
                           force_increasing_mass=force_increasing_mass

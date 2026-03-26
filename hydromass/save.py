@@ -6,11 +6,12 @@ import pickle
 
 from astropy.units.decorators import NoneType
 
-from .plots import rads_more, kt_from_samples, P_from_samples
+from .plots import kt_from_samples, P_from_samples
 from .functions import Model
 from .nonparametric import calc_gp_operator_lognormal, calc_gp_grad_operator_lognormal, kt_GP_from_samples, P_GP_from_samples, mass_GP_from_samples, prof_GP_hires, Run_NonParametric_PyMC3
 from .forward import kt_forw_from_samples, P_forw_from_samples, Forward
 from .deproject import calc_density_operator, list_params, calc_linear_operator, calc_sb_operator, list_params_density, calc_grad_operator
+from .utility import rads_more
 
 __all__ = ['SaveModel', 'ReloadModel', 'SaveGP', 'ReloadGP', 'SaveForward', 'ReloadForward', 'SaveProfiles', 'LoadProfiles']
 
@@ -912,6 +913,10 @@ def SaveForward(Mhyd, Forward, outfile=None):
 
         cols.append(col)
 
+    if hasattr(Mhyd, 'eta'):
+        col = fits.Column(name = 'eta', format = 'E', array = Mhyd.eta)
+        cols.append(col)
+
     coldefs = fits.ColDefs(cols)
 
     modhdu = fits.BinTableHDU.from_columns(coldefs)
@@ -1061,6 +1066,9 @@ def ReloadForward(Mhyd, infile):
         name = mod.parnames[i]
 
         Mhyd.samppar[:, i] = dpar[name]
+
+    if 'eta' in dpar.columns.names:
+        Mhyd.eta = dpar['eta']
 
     something_went_wrong = False
 

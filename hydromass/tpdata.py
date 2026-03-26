@@ -490,6 +490,8 @@ class SZData:
 
         self.rref_sz = (self.rin_sz + self.rout_sz) / 2.
 
+        self.psfmat = None
+
 
 
 

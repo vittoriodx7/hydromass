@@ -4,13 +4,17 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="5521cb6d-2b2a-4738-9850-2cb9dfed795b" name="Changes" comment="Fixed spectral projection">
+    <list default="true" id="5521cb6d-2b2a-4738-9850-2cb9dfed795b" name="Changes" comment="Fixed bug in mass_GP_from_samples and created dens_utils function to compute density and mgas">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/hydromass/__init__.py" beforeDir="false" afterPath="$PROJECT_DIR$/hydromass/__init__.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/hydromass/delta.py" beforeDir="false" afterPath="$PROJECT_DIR$/hydromass/delta.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/hydromass/forward.py" beforeDir="false" afterPath="$PROJECT_DIR$/hydromass/forward.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/hydromass/mhyd.py" beforeDir="false" afterPath="$PROJECT_DIR$/hydromass/mhyd.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/hydromass/nonparametric.py" beforeDir="false" afterPath="$PROJECT_DIR$/hydromass/nonparametric.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/hydromass/plots.py" beforeDir="false" afterPath="$PROJECT_DIR$/hydromass/plots.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/hydromass/polytropic.py" beforeDir="false" afterPath="$PROJECT_DIR$/hydromass/polytropic.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/hydromass/save.py" beforeDir="false" afterPath="$PROJECT_DIR$/hydromass/save.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/hydromass/tpdata.py" beforeDir="false" afterPath="$PROJECT_DIR$/hydromass/tpdata.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/hydromass/utility.py" beforeDir="false" afterPath="$PROJECT_DIR$/hydromass/utility.py" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
@@ -68,7 +72,7 @@
   <component name="SharedIndexes">
     <attachedChunks>
       <set>
-        <option value="bundled-python-sdk-4762d8aabb82-6d6dccd035ac-com.jetbrains.pycharm.pro.sharedIndexes.bundled-PY-253.30387.173" />
+        <option value="bundled-python-sdk-2653e85de345-6d6dccd035ac-com.jetbrains.pycharm.pro.sharedIndexes.bundled-PY-253.31033.139" />
       </set>
     </attachedChunks>
   </component>
@@ -456,7 +460,23 @@
       <option name="project" value="LOCAL" />
       <updated>1770902437438</updated>
     </task>
-    <option name="localTasksCounter" value="48" />
+    <task id="LOCAL-00048" summary="Fixed spectral projection">
+      <option name="closed" value="true" />
+      <created>1772527664373</created>
+      <option name="number" value="00048" />
+      <option name="presentableId" value="LOCAL-00048" />
+      <option name="project" value="LOCAL" />
+      <updated>1772527664373</updated>
+    </task>
+    <task id="LOCAL-00049" summary="Fixed bug in mass_GP_from_samples and created dens_utils function to compute density and mgas">
+      <option name="closed" value="true" />
+      <created>1774446459688</created>
+      <option name="number" value="00049" />
+      <option name="presentableId" value="LOCAL-00049" />
+      <option name="project" value="LOCAL" />
+      <updated>1774446459688</updated>
+    </task>
+    <option name="localTasksCounter" value="50" />
     <servers />
   </component>
   <component name="Vcs.Log.Tabs.Properties">
@@ -471,7 +491,6 @@
     </option>
   </component>
   <component name="VcsManagerConfiguration">
-    <MESSAGE value="Fixed imports" />
     <MESSAGE value="Fixed bug in forward.py" />
     <MESSAGE value="Fixed bug in save.py" />
     <MESSAGE value="Estimated P0 value can change by exactly one order of magnitude&#10;&#10;Added max_rad to Mhyd. It will be used in the construction of the physical cluster model, e.g. going to 4 Mpc" />
@@ -496,6 +515,7 @@
     <MESSAGE value="Added force_convective_stability and force_positive_mass options. They respectively force dlogK/dlogR &gt; 0, M&gt;0 and dlogM/dlogR &lt; 0. First one serves to have increasing entropy, second one to have positive mass, third to have increasing mass" />
     <MESSAGE value="Improved stability of convective stability, positive mass, increasing mass with &#10;def softplus(x):&#10;    return pm.math.log(1+pm.math.exp(x))" />
     <MESSAGE value="Fixed spectral projection" />
-    <option name="LAST_COMMIT_MESSAGE" value="Fixed spectral projection" />
+    <MESSAGE value="Fixed bug in mass_GP_from_samples and created dens_utils function to compute density and mgas" />
+    <option name="LAST_COMMIT_MESSAGE" value="Fixed bug in mass_GP_from_samples and created dens_utils function to compute density and mgas" />
   </component>
 </project>

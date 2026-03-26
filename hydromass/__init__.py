@@ -13,5 +13,6 @@ from .save import *
 from .contour import *
 from .wl import *
 from .nonparametric import *
+from .utility import *
 
 

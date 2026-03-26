@@ -12,10 +12,11 @@ from scipy.interpolate import interp1d
 
 from .deproject import calc_density_operator, calc_density_operator_pm, MyDeprojVol, elongation_correction_np
 from .constants import cgsamu, cgskpc, Msun, const_G_Msun_kpc, kev2erg, year, y_prefactor
+from .utility import dens_utils, rads_more
 from .wl import get_radplus, rho_to_sigma_np, dsigma_trap_np, get_shear
 from .pnt import get_data_file_path, alpha_turb_np
 
-__all__ = ['get_coolfunc', 'cumsum_mat', 'rads_more', 'gnfw_p0', 'estimate_P0', 'estimate_T0', 'densout_pout_from_samples', 'kt_from_samples',
+__all__ = ['get_coolfunc', 'cumsum_mat', 'gnfw_p0', 'estimate_P0', 'estimate_T0', 'densout_pout_from_samples', 'kt_from_samples',
            'P_from_samples', 'g_from_samples', 'mass_from_samples', 'prof_hires', 'mgas_pm', 'PlotMgas']
 
 def get_coolfunc(Z):
@@ -103,135 +104,7 @@ def cumsum_mat(nval):
     return  totmat
 
 
-def rads_more(Mhyd, nmore=5, extend=False):
-    """
 
-    Return grid of (in, out) radii from X-ray, SZ data or both. Concatenates radii if necessary, then computes a grid of radii.
-    Returns the output arrays and the indices corresponding to the input X-ray and/or SZ radii.
-
-    :param Mhyd: A :class:`hydromass.mhyd.Mhyd` object containing loaded X-ray and/or SZ loaded data.
-    :type Mhyd: class:`hydromass.mhyd.Mhyd`
-    :param nmore: Number of subgrid values to compute the fine binning. Each input bin will be split into nmore values. Defaults to 5.
-    :type nmore: int
-    :return:
-        - rin, rout: the inner and outer radii of the fine grid
-        - index_x, index_sz: lists of indices corresponding to the position of the input values in the grid
-        - sum_mat: matrix containing the number of values in each subgrid bin
-        - ntm: total number of grid points
-    """
-    if Mhyd.spec_data is not None and Mhyd.sz_data is None:
-
-        rout_joint = Mhyd.spec_data.rout_x
-
-        rref_joint = Mhyd.spec_data.rref_x
-
-    elif Mhyd.spec_data is None and Mhyd.sz_data is not None:
-
-        rout_joint = Mhyd.sz_data.rout_sz
-
-        rref_joint = Mhyd.sz_data.rref_sz
-
-    elif Mhyd.spec_data is not None and Mhyd.sz_data is not None:
-
-        rout_joint = np.sort(np.append(Mhyd.spec_data.rout_x, Mhyd.sz_data.rout_sz))
-
-        rref_joint = np.sort(np.append(Mhyd.spec_data.rref_x, Mhyd.sz_data.rref_sz))
-
-    else:
-
-        print('No loaded data found in input hydromass.Mhyd object, nothing to do')
-
-        return
-
-    rin_joint = np.roll(rout_joint, 1)
-
-    rin_joint[0] = 0.
-
-    njoint = len(rref_joint)
-
-    tot_joint = np.sort(np.append(rin_joint, rref_joint))
-
-    ntotjoint = len(tot_joint)
-
-    ntm = int((ntotjoint - 0.5) * nmore)
-
-    rout_more = np.empty(ntm)
-
-    for i in range(ntotjoint - 1):
-
-        rout_more[i * nmore:(i + 1) * nmore] = np.linspace(tot_joint[i], tot_joint[i + 1], nmore + 1)[1:]
-
-    rout_more[(ntotjoint - 1) * nmore:] = np.linspace(rref_joint[njoint - 1], rout_joint[njoint - 1], int(nmore / 2.) + 1)[1:]
-
-    # Move the outer boundary to the edge of the SB profile if it is farther out
-    sbprof = Mhyd.sbprof
-
-    if Mhyd.max_rad > np.max(rout_more):
-        nvm = len(rout_more)
-
-        dx_out = rout_more[nvm - 1] - rout_more[nvm - 2]
-
-        rout_2add = np.arange(np.max(rout_more), Mhyd.max_rad, dx_out)
-
-        rout_2add = np.append(rout_2add[1:], Mhyd.max_rad)
-
-        rout_more = np.append(rout_more, rout_2add)
-
-        ntm = len(rout_more)
-
-    rin_more = np.roll(rout_more, 1)
-
-    rin_more[0] = 0
-
-    index_x, index_sz = None, None
-
-    if Mhyd.spec_data is not None:
-
-        index_x = np.where(np.in1d(rout_more, Mhyd.spec_data.rref_x))
-
-    if Mhyd.sz_data is not None:
-
-        index_sz = np.where(np.in1d(rout_more, Mhyd.sz_data.rref_sz))
-
-    sum_mat = None
-
-    if Mhyd.spec_data is not None:
-
-        ntot = len(rout_more)
-
-        nx = len(Mhyd.spec_data.rref_x)
-
-        if not extend:
-
-            sum_mat = np.zeros((nx, ntot))
-
-        else:
-
-            if Mhyd.spec_data.rout_x[nx-1] < np.max(rin_more):
-                sum_mat = np.zeros((nx+1, ntot))
-
-            else:
-                sum_mat = np.zeros((nx, ntot))
-
-        for i in range(nx):
-
-            ix = np.where(np.logical_and(rin_more < Mhyd.spec_data.rout_x[i], rin_more >= Mhyd.spec_data.rin_x[i]))
-
-            nval = len(ix[0])
-
-            sum_mat[i, :][ix] = 1. / nval
-
-        if extend:
-
-            if Mhyd.spec_data.rout_x[nx-1] < np.max(rin_more):
-
-                ix = np.where(rin_more >= Mhyd.spec_data.rout_x[nx-1])
-
-                nval = len(ix[0])
-
-                sum_mat[nx, :][ix] = 1. / nval
-
-    return rin_more, rout_more, index_x, index_sz, sum_mat, ntm
 
 def gnfw_p0(x,pars):
     '''
@@ -829,7 +702,7 @@ def g_from_samples(Mhyd, model, n_draw=None, random_state=None):
     return gplus_elong, rm[np.arange(len(rm)-2)+1], ev
 
 
-def mass_from_samples(Mhyd, model, rin=None, rout=None, npt=200, plot=False):
+def mass_from_samples(Mhyd, model, plot=False, **kwargs):
     """
     Compute the median and percentile mass profile, gas mass and gas fraction from an existing mass reconstruction run
 
@@ -849,80 +722,55 @@ def mass_from_samples(Mhyd, model, rin=None, rout=None, npt=200, plot=False):
     :rtype: dict(16xnpt)
     """
 
-    if not Mhyd.wlonly:
-        rin_m, rout_m, index_x, index_sz, sum_mat, ntm = rads_more(Mhyd, nmore=Mhyd.nmore)
+    if Mhyd.wlonly:
 
-        if rin is None:
-            rin = np.min(rin_m)
+        rin = None
 
-            if rin == 0:
-                rin = 1.
-
-        if rout is None:
-            rout = np.max(rout_m)
-
-    else:
+        if 'rin' in kwargs:
+            rin = kwargs['rin']
 
         if rin is None:
             rin = 10.
 
+        rout = None
+
+        if 'rout' in kwargs:
+            rout = kwargs['rout']
+
         if rout is None:
             rout = 3000.
 
-    bins = np.logspace(np.log10(rin), np.log10(rout), npt + 1)
+        kwargs['rin'] = rin
+        kwargs['rout'] = rout
 
-    # I don't understand the purpuse of this check
-    if rin == 1.:
-        bins[0] = 0.
+    bins, rin_m, rout_m, rref_m, dens_m, mgas, nvalm, nsamp, Kdens_grad, cf_prof = dens_utils(Mhyd, **kwargs)
 
-    rin_m = bins[:npt]
+    if Mhyd.wlonly:
 
-    rout_m = bins[1:]
+        mass = Mhyd.mfact * model.func_np(rout_m, Mhyd.samppar, delta = model.delta) * 1e13
 
-    rref_m = (rin_m + rout_m) / 2.
+        mmed, mlo, mhi = np.percentile(mass, [50., 50. - 68.3 / 2., 50. + 68.3 / 2.], axis = 0)
 
-    nsamp = len(Mhyd.samppar)
+        dict = {
+            "R_IN": rin_m,
+            "R_OUT": rout_m,
+            "R_REF": rref_m,
+            "MASS": mmed,
+            "MASS_LO": mlo,
+            "MASS_HI": mhi,
+            "M_DM": mmed,
+            "M_DM_LO": mlo,
+            "M_DM_HI": mhi,
+            "MGAS": np.zeros(nvalm),
+            "MGAS_LO": np.zeros(nvalm),
+            "MGAS_HI": np.zeros(nvalm),
+            "FGAS": np.zeros(nvalm),
+            "FGAS_LO": np.zeros(nvalm),
+            "FGAS_HI": np.zeros(nvalm),
+            "M_STAR": np.zeros(nvalm)
+        }
 
-    nvalm = len(rin_m)
-
-    if not Mhyd.wlonly:
-
-        if Mhyd.cf_prof is not None:
-
-            rref_m = (rin_m + rout_m) / 2.
-
-            rad = Mhyd.sbprof.bins
-
-            tcf = np.interp(rref_m, rad * Mhyd.amin2kpc, Mhyd.ccf)
-
-            cf_prof = np.repeat(tcf, nsamp).reshape(nvalm, nsamp)
-
-        else:
-
-            cf_prof = Mhyd.ccf
-
-        if Mhyd.fit_bkg:
-
-            Kdens_m = calc_density_operator(rref_m / Mhyd.amin2kpc, Mhyd.pardens, Mhyd.amin2kpc)
-
-        else:
-
-            Kdens_m = calc_density_operator(rref_m / Mhyd.amin2kpc, Mhyd.pardens, Mhyd.amin2kpc, withbkg=False)
-
-        alldens = np.sqrt(np.dot(Kdens_m, np.exp(Mhyd.samples.T)) / cf_prof * Mhyd.transf)
-
-        # Matrix containing integration volumes
-        volmat = np.repeat(4. / 3. * np.pi * (rout_m ** 3 - rin_m ** 3), nsamp).reshape(nvalm, nsamp)
-
-        # Compute Mgas profile as cumulative sum over the volume
-
-        nhconv = cgsamu * Mhyd.mu_e * cgskpc ** 3 / Msun  # Msun/kpc^3
-
-        ones_mat = np.ones((nvalm, nvalm))
-
-        cs_mat = np.tril(ones_mat)
-
-        mgas = np.dot(cs_mat, alldens * nhconv * volmat)
+    else:
 
         mg, mgl, mgh = np.percentile(mgas, [50., 50. - 68.3 / 2., 50. + 68.3 / 2.], axis=1)
 
@@ -1054,32 +902,6 @@ def mass_from_samples(Mhyd, model, rin=None, rout=None, npt=200, plot=False):
 
             dict[f'M_{comp1}_HI'] = m_comp_1hi
 
-
-
-    else:
-
-        mass = Mhyd.mfact * model.func_np(rout_m, Mhyd.samppar, delta=model.delta) * 1e13
-
-        mmed, mlo, mhi = np.percentile(mass, [50., 50. - 68.3 / 2., 50. + 68.3 / 2.], axis=0)
-
-        dict = {
-            "R_IN": rin_m,
-            "R_OUT": rout_m,
-            "R_REF": rref_m,
-            "MASS": mmed,
-            "MASS_LO": mlo,
-            "MASS_HI": mhi,
-            "M_DM": mmed,
-            "M_DM_LO": mlo,
-            "M_DM_HI": mhi,
-            "MGAS": np.zeros(nvalm),
-            "MGAS_LO": np.zeros(nvalm),
-            "MGAS_HI": np.zeros(nvalm),
-            "FGAS": np.zeros(nvalm),
-            "FGAS_LO": np.zeros(nvalm),
-            "FGAS_HI": np.zeros(nvalm),
-            "M_STAR": np.zeros(nvalm)
-        }
 
     if plot:
 

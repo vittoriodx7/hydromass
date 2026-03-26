@@ -8,8 +8,8 @@ from astropy.cosmology.units import redshift
 
 from .constants import cgskpc, cgsG, kev2erg, Msun, cgsamu, const_G_Msun_kpc, year
 from .deproject import MyDeprojVol, calc_density_operator, calc_grad_operator, list_params_density, list_params, calc_linear_operator, calc_sb_operator
-from .plots import rads_more, get_coolfunc, estimate_T0
-from .utility import sb_utils, dens_utils
+from .plots import get_coolfunc, estimate_T0
+from .utility import sb_utils, dens_utils, rads_more
 
 __all__ = ['calc_gp_operator', 'calc_gp_operator_lognormal', 'calc_gp_grad_operator', 'calc_gp_grad_operator_lognormal', 'kt_GP_from_samples',
            'P_GP_from_samples', 'mass_GP_from_samples', 'prof_GP_hires', 'Run_NonParametric_PyMC3']
@@ -425,7 +425,7 @@ def mass_GP_from_samples(Mhyd, plot=False, **kwargs):
     :rtype: dict(11xnpt)
     '''
 
-    bins, rin_m, rout_m, dens_m, mgas, nvalm, nsamp, Kdens_grad, cf_prof = dens_utils(Mhyd, **kwargs)
+    bins, rin_m, rout_m, rref_m, dens_m, mgas, nvalm, nsamp, Kdens_grad, cf_prof = dens_utils(Mhyd, **kwargs)
 
     grad_dens = np.dot(Kdens_grad, np.exp(Mhyd.samples.T)) / 2. / dens_m ** 2 / cf_prof * Mhyd.transf
 
@@ -489,6 +489,7 @@ def mass_GP_from_samples(Mhyd, plot=False, **kwargs):
     dict = {
         "R_IN": rin_m,
         "R_OUT": rout_m,
+        "R_REF": rref_m,
         "MASS": mmed,
         "MASS_LO": mlo,
         "MASS_HI": mhi,

@@ -4,9 +4,9 @@ import time
 import matplotlib.pyplot as plt
 
 from .deproject import MyDeprojVol, calc_density_operator, list_params, calc_linear_operator, calc_sb_operator, list_params_density
-from .plots import rads_more, get_coolfunc
+from .plots import get_coolfunc
 from .constants import cgskpc, cgsMpc, cgsG, cgsamu, kev2erg, Msun, const_G_Msun_kpc, year, y_prefactor
-from .utility import sb_utils, dens_utils
+from .utility import sb_utils, dens_utils, rads_more
 
 __all__ = ['gnfw_pm', 'gnfw_np', 'der_lnP_np', 'kt_forw_from_samples', 'P_forw_from_samples', 'mass_forw_from_samples', 'prof_forw_hires',
            'Forward', 'Run_Forward_PyMC3']
@@ -294,7 +294,7 @@ def mass_forw_from_samples(Mhyd, Forward, plot=False, mstar=None, **kwargs):
     :rtype: dict(11xnpt)
     '''
 
-    bins, rin_m, rout_m, dens_m, mgas, nvalm, nsamp, Kdens_grad, cf_prof = dens_utils(Mhyd, **kwargs)
+    bins, rin_m, rout_m, rref_m, dens_m, mgas, nvalm, nsamp, Kdens_grad, cf_prof = dens_utils(Mhyd, **kwargs)
 
     p3d = Forward.func_np(rout_m, Mhyd.samppar)
 
@@ -337,7 +337,7 @@ def mass_forw_from_samples(Mhyd, Forward, plot=False, mstar=None, **kwargs):
     dict = {
         "R_IN": rin_m,
         "R_OUT": rout_m,
-        "R_REF": (rin_m + rout_m) / 2,
+        "R_REF": rref_m,
         "MASS": mmed,
         "MASS_LO": mlo,
         "MASS_HI": mhi,
