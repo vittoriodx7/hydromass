@@ -1119,9 +1119,17 @@ def mgas_pm(rin_m, rout_m, dens):
 
     cs_mat = np.tril(ones_mat)
 
-    mgas = pm.math.dot(cs_mat, dens * volint) / 1e13
+    mgas_out = pm.math.dot(cs_mat, dens * volint) / 1e13
 
-    return mgas
+    rin_m_roll = np.roll(rin_m, 1)
+
+    rin_m_roll[0] = 0
+
+    volint = 4. / 3. * np.pi * (rin_m ** 3 - rin_m_roll ** 3)
+
+    mgas_in = pm.math.dot(cs_mat, dens * volint) / 1e13
+
+    return mgas_out, mgas_in
 
 
 def PlotMgas(Mhyd, plot=False, outfile=None, nmore=5):
