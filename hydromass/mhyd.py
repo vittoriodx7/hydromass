@@ -304,10 +304,11 @@ def Run_Mhyd_PyMC3(Mhyd,model,bkglim=None,nmcmc=1000,fit_bkg=False,back=None,
     #
     #     Kdens_m = calc_density_operator(rref_m / Mhyd.amin2kpc, pardens, Mhyd.amin2kpc, withbkg=False)
 
-    (testval, testbkg, npt, bkgcounts, counts, sb, esb, valid, cf, rin_m, rout_m, rref_m, proj_mat, volmat, index_sz, ntm, rad, rmin, rmax,
+    (testval, testbkg, npt, bkgcounts, counts, sb, esb, valid, cf, rin_m, rout_m, rref_m, weights_rout_m, proj_mat, volmat, index_sz, ntm, rad, rmin, rmax,
      nbin) = sb_utils(Mhyd, fit_bkg = fit_bkg, rmin = rmin, rmax = rmax, bkglim = bkglim, back = back, nrc = nrc,
                       nbetas = nbetas, min_beta = min_beta, nmore = nmore)
 
+    dlogr = (np.log(rout_m) - np.log(rin_m))
 
     if dmonly and mstar is not None:
 
@@ -315,7 +316,7 @@ def Run_Mhyd_PyMC3(Mhyd,model,bkglim=None,nmcmc=1000,fit_bkg=False,back=None,
 
         cum_mstar = mstar[:, 1]
 
-        mstar_m = np.interp(rout_m, r_mstar, cum_mstar)
+        mstar_m_out = np.interp(rout_m, r_mstar, cum_mstar)
 
     nptmore = len(rout_m)
 
@@ -493,42 +494,48 @@ def Run_Mhyd_PyMC3(Mhyd,model,bkglim=None,nmcmc=1000,fit_bkg=False,back=None,
 
                 Kdens_t = calc_density_operator_pm(rref_m / Mhyd.amin2kpc, Mhyd.pardens, elongation, Mhyd.amin2kpc)
 
+                Kdens_t_out = calc_density_operator_pm(rout_m / Mhyd.amin2kpc, Mhyd.pardens, elongation, Mhyd.amin2kpc)
+
                 dens_m = pm.math.sqrt(pm.math.dot(Kdens_t, al) / cf * Mhyd.transf)  # electron density in cm-3
+
+                dens_m_out = pm.math.sqrt(pm.math.dot(Kdens_t_out, al) / cf * Mhyd.transf)  # electron density in cm-3
 
             else:
 
                 dens_m = pm.math.sqrt(pm.math.dot(Mhyd.Kdens_m, al) / cf * Mhyd.transf)  # electron density in cm-3
 
-            mbar = 0
+                dens_m_out = pm.math.sqrt(pm.math.dot(Mhyd.Kdens_m_out, al) / cf * Mhyd.transf)  # electron density in cm-3
+
+            mbar_out = 0
             if dmonly:
 
                 nhconv = cgsamu * Mhyd.mu_e * cgskpc ** 3 / Msun  # Msun/kpc^3
 
-                mgas = mgas_pm(rin_m, rout_m, dens_m) * nhconv / Mhyd.mfact0
+                mgas_out = mgas_pm(rin_m, rout_m, dens_m) * nhconv / Mhyd.mfact0
 
                 # Add stellar mass if provided
                 if mstar is not None:
 
-                    mbar = mgas + mstar_m / Mhyd.mfact0 / 1e13
+                    mbar_out = mgas_out + mstar_m_out / Mhyd.mfact0 / 1e13
 
                 else:
 
-                    mbar = mgas
+                    mbar_out = mgas_out
 
             # Evaluate mass model
             if model.massmod in ['MOND', 'GMOND', 'EMOND']:
 
                 # MOND also needs baryon mass
 
-                assert mbar != 0, 'Cannot use MOND/GMOND/EMOND if baryons are not passed. Select dmonly=True and optionally pass mstar'
+                assert mbar_out != 0, 'Cannot use MOND/GMOND/EMOND if baryons are not passed. Select dmonly=True and optionally pass mstar'
 
-                mass = model.func_pm(rref_m, *pmod, mbar = mbar * 1e13 * Mhyd.mfact0) / Mhyd.mfact0 / 1e13
+                mass = model.func_pm(rref_m, *pmod, mbar = mbar_out * 1e13 * Mhyd.mfact0) / Mhyd.mfact0 / 1e13
 
             else:
 
                 mass = Mhyd.mfact * model.func_pm(rref_m, *pmod, delta = model.delta) / Mhyd.mfact0
 
-                mass = mass + mbar
+                mass = mass + mbar_out # This is wrong. Adding something at rref + something at rout
 
             # Pressure gradient
             dpres = - mass / rref_m ** 2 * dens_m * (rout_m - rin_m)
@@ -597,10 +604,10 @@ def Run_Mhyd_PyMC3(Mhyd,model,bkglim=None,nmcmc=1000,fit_bkg=False,back=None,
             if Mhyd.spec_data is not None:
 
                 # Model temperature
-                t3d = pth / dens_m
+                t3d = pth / dens_m_out
 
                 # Mazzotta weights
-                ei = dens_m ** 2 * t3d ** (-0.75)
+                ei = dens_m_out ** 2 * t3d ** (-0.75)
 
                 # Temperature projection
                 flux = pm.math.dot(proj_mat, ei)
