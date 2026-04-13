@@ -1,6 +1,10 @@
+import copy
 import os
+
+import ipdb
 import  numpy as np
 import matplotlib.pyplot as plt
+from jax.experimental.mosaic.gpu import TMABarrier
 from scipy.interpolate import interp1d
 from scipy.optimize import minimize
 import logging
@@ -252,13 +256,33 @@ def vikh_temp(x, pars, Tmin):
     acool=pars[2]
     rt=pars[3]
     c=pars[4]
-    numer=Tmin/T0+np.power(x/rcool,acool)
-    denom=1.+np.power(x/rcool,acool)
+    numer = Tmin/T0 + np.power(x/rcool,acool)
+    denom = 1.      + np.power(x/rcool,acool)
     t2=np.power(1.+(x/rt)**2,-c/2)
     return T0*numer/denom*t2
 
+def vikh_temp_average(R, pars):
+    T0 = pars[0]
+    R500 = pars[1]
+    rcool = pars[2]
+    acool = pars[3]
+    Tmin = pars[4]
+    c = pars[5]
+    rt = pars[6]
+    b=2
+    a=0
+    #
+    r = R / R500
+    #
+    x = (r/rcool)**acool
+    t1 = (Tmin/T0 + x) / (1+x)
+    t2 = (r/rt)**(-a) / ((1+(r/rt)**b)**c/b)
+    return T0*t1*t2# T0 * 1.35 * (0.45+(x/0.045)**1.9) / (1+(x/0.045)**1.9) / (1+(x/0.6)**2)**0.45
+
+
 def variable_ccf(Mhyd, cosmo, z, nh, rmf, method='interp', abund='aspl', elow=0.5, ehigh=2.0,
-                 unit='cr', lum_elow=0.5, lum_ehigh=2.0, arf=None, outz=None, outkt=None, tmpdir='.', out_cfact_file=None, quiet=False):
+                 unit='cr', lum_elow=0.5, lum_ehigh=2.0, arf=None, outz=None, outkt=None, tmpdir='.', out_cfact_file=None, quiet=False,
+                 use_medsmooth=False, zfe_fit=True):
     '''
 
     :param Mhyd: Hydromass object
@@ -293,6 +317,9 @@ def variable_ccf(Mhyd, cosmo, z, nh, rmf, method='interp', abund='aspl', elow=0.
     :rtype: float
     '''
 
+    if out_cfact_file:
+        out_cfact_pdf = '.'.join(out_cfact_file.split('.')[:-1]+['pdf'])
+
     if Mhyd.spec_data is None:
 
         Mhyd.logger.info('No spectral data loaded, aborting')
@@ -313,13 +340,9 @@ def variable_ccf(Mhyd, cosmo, z, nh, rmf, method='interp', abund='aspl', elow=0.
 
     if method=='fit':
 
-        pars_temp = np.array([1.2, np.exp(-2.90), 1.06, 0.36, 0.28 * 2.0])
+        def optim_kt(pars):
 
-        def optim_kt(pars, Tmin):
-
-            x = spec_data.rref_x / 500.  # assuming R500=500 kpc
-
-            mod_kt = vikh_temp(x, pars, Tmin)
+            mod_kt = vikh_temp_average(spec_data.rref_x, pars)
 
             chi2 = np.sum((mod_kt - spec_data.temp_x) ** 2 / spec_data.errt_x ** 2)
 
@@ -329,13 +352,15 @@ def variable_ccf(Mhyd, cosmo, z, nh, rmf, method='interp', abund='aspl', elow=0.
 
             return chi2
 
-        Tmin = 0.6 * np.max(medsmooth(spec_data.temp_x))
+        R500 = 600
 
-        res = minimize(optim_kt, pars_temp, method='Nelder-Mead', args=(Tmin))
+        T0 = np.mean(spec_data.temp_x)
 
-        ktfit = res['x']
+        pars_temp = [T0, R500, 0.045, 1.9, 0.45*T0, 0.9, 0.6]
 
-        ktprof = vikh_temp(bins * Mhyd.amin2kpc / 500., ktfit, Tmin)
+        res = minimize(optim_kt, pars_temp, method='Nelder-Mead')
+
+        ktprof = vikh_temp_average(bins * Mhyd.amin2kpc, res['x'])
 
         if outkt is not None:
 
@@ -377,10 +402,18 @@ def variable_ccf(Mhyd, cosmo, z, nh, rmf, method='interp', abund='aspl', elow=0.
         fill_value = (spec_data.temp_x[0], spec_data.temp_x[nkt - 1])
 
         if len(spec_data.rref_x_am) > 3:
-            fint = interp1d(spec_data.rref_x_am, medsmooth(spec_data.temp_x), kind='cubic', fill_value=fill_value,
-                        bounds_error=False)
+            if use_medsmooth:
+                fint = interp1d(spec_data.rref_x_am, medsmooth(spec_data.temp_x), kind='cubic', fill_value=fill_value,
+                            bounds_error=False)
+            else:
+                fint = interp1d(spec_data.rref_x_am, spec_data.temp_x, kind = 'cubic', fill_value = fill_value,
+                                bounds_error = False)
         else:
-            fint = interp1d(spec_data.rref_x_am, medsmooth(spec_data.temp_x), fill_value = fill_value,
+            if use_medsmooth:
+                fint = interp1d(spec_data.rref_x_am, medsmooth(spec_data.temp_x), fill_value = fill_value,
+                            bounds_error = False)
+            else:
+                fint = interp1d(spec_data.rref_x_am, spec_data.temp_x, fill_value = fill_value,
                             bounds_error = False)
 
         ktprof = fint(bins)
@@ -393,13 +426,13 @@ def variable_ccf(Mhyd, cosmo, z, nh, rmf, method='interp', abund='aspl', elow=0.
 
         for i in range(nbin):
 
-
+            zfe_val = 0.3
 
             cf_prof[i], lf_prof[i], lum_prof[i], cr_prof[i], fx_prof[i] = calc_emissivity(cosmo=cosmo,
                                          z=z,
                                          nh=nh,
                                          kt=ktprof[i],
-                                         Z=0.3,
+                                         Z=zfe_val,
                                          elow=elow,
                                          ehigh=ehigh,
                                          rmf=rmf,
@@ -412,47 +445,77 @@ def variable_ccf(Mhyd, cosmo, z, nh, rmf, method='interp', abund='aspl', elow=0.
                                          quiet = quiet
                                          )
 
-            zfe_prof[i] = 0.3
+            zfe_prof[i] = zfe_val
 
     else:
 
-        Mhyd.logger.info('Modeling abundance profile...')
-
         active = np.where(spec_data.zfe_lo > 0.)
 
-        rads_z = spec_data.rref_x[active]
+        spec_data_zfe_orig = copy.deepcopy(spec_data.zfe)
 
-        beta_fe = 0.3
+        sel = (spec_data.zfe_lo / spec_data.zfe > 0.3)
+        spec_data.zfe[sel] = 0.3
 
-        pars_fe = np.array([30., 0.5, 0.2])
+        if zfe_fit:
+            Mhyd.logger.info('Modeling abundance profile...')
 
-        def optim_zfe(pars):
 
-            rc = pars[0]
-            norm = pars[1]
-            floor = pars[2]
 
-            pred = floor + norm * (1. + (rads_z / rc) ** 2) ** (-beta_fe)
+            rads_z = spec_data.rref_x[active]
 
-            chi2 = np.sum((pred - spec_data.zfe[active]) ** 2 / spec_data.zfe_hi[active] ** 2)
+            beta_fe = 0.3
 
-            if rc<=0 or floor<0 or norm<-0.2:
+            pars_fe = np.array([30., 0.5, 0.2])
 
-                chi2 = chi2 + 1e10
+            def optim_zfe(pars):
 
-            return chi2
+                rc = pars[0]
+                norm = pars[1]
+                floor = pars[2]
 
-        res = minimize(optim_zfe, pars_fe, method='Nelder-Mead')
+                pred = floor + norm * (1. + (rads_z / rc) ** 2) ** (-beta_fe)
 
-        zfit = res['x']
+                chi2 = np.sum((pred - spec_data.zfe[active]) ** 2 / spec_data.zfe_hi[active] ** 2)
 
-        med_rc = zfit[0]
+                if rc<=0 or floor<0 or norm<-0.2:
 
-        med_floor = zfit[2]
+                    chi2 = chi2 + 1e10
 
-        med_norm = zfit[1]
+                return chi2
 
-        zfe_prof = med_floor + med_norm * (1. + (bins*Mhyd.amin2kpc/med_rc)**2) ** (-beta_fe)
+            res = minimize(optim_zfe, pars_fe, method='Nelder-Mead')
+
+            zfit = res['x']
+
+            med_rc = zfit[0]
+
+            med_floor = zfit[2]
+
+            med_norm = zfit[1]
+
+            zfe_prof = med_floor + med_norm * (1. + (bins*Mhyd.amin2kpc/med_rc)**2) ** (-beta_fe)
+
+        else:
+            fill_value = (spec_data.zfe[active][0], spec_data.zfe[active][-1])
+
+            if len(spec_data.rref_x_am) > 3:
+                if use_medsmooth:
+                    fint = interp1d(spec_data.rref_x_am[active], medsmooth(spec_data.zfe[active]), kind='linear', fill_value=fill_value,
+                                bounds_error=False)
+                else:
+                    fint = interp1d(spec_data.rref_x_am[active], spec_data.zfe[active], kind = 'linear', fill_value = fill_value,
+                                    bounds_error = False)
+            else:
+                if use_medsmooth:
+                    fint = interp1d(spec_data.rref_x_am[active], medsmooth(spec_data.zfe[active]), fill_value = fill_value,
+                                bounds_error = False)
+                else:
+                    fint = interp1d(spec_data.rref_x_am[active], spec_data.zfe[active], fill_value = fill_value,
+                                    bounds_error = False)
+
+            zfe_prof = fint(bins)
+
+            # zfe_prof = np.clip(zfe_prof, 0.3, 0.4)
 
         for i in range(nbin):
 
@@ -502,11 +565,62 @@ def variable_ccf(Mhyd, cosmo, z, nh, rmf, method='interp', abund='aspl', elow=0.
             plt.ylabel('$Z/Z_{\odot}$', fontsize=28)
 
             plt.savefig(outz)
+
     if out_cfact_file:
         with open(out_cfact_file, 'w') as f:
             print('#           R           e_R            kT             Z            CR          FLUX           LUM ', file = f)
             for i in range(nbin):
                 print(f'{bins[i]:13.7g} {ebins[i]:13.7g} {ktprof[i]:13.7g} {zfe_prof[i]:13.7g} {cr_prof[i]:13.7g} {fx_prof[i]:13.7g} {lum_prof[i]:13.7g}', file=f)
+
+        fig, axs = plt.subplots(3, 1, figsize = (14, 10), sharex = True)
+
+        ax = axs[0]
+
+        ax.plot(bins, ktprof, label = 'ktprof for cf')
+
+        ax.errorbar(spec_data.rref_x_am, spec_data.temp_x, yerr = [spec_data.templ, spec_data.temph], fmt = 'o', ls = '--', label = 'Data', color = 'r')
+
+        ax.set_ylabel('kT [keV]', fontsize = 18)
+
+        ax.legend(fontsize = 18)
+
+        ax = axs[1]
+
+        ax.plot(bins, zfe_prof, label = 'zfeprof for cf')
+
+        ax.errorbar(spec_data.rref_x_am, spec_data_zfe_orig, yerr = [spec_data.zfe_lo, spec_data.zfe_hi], fmt = 'o', ls = '--', label = 'Data', color = 'k')
+
+
+        ax.errorbar(spec_data.rref_x_am, spec_data.zfe, yerr = [spec_data.zfe_lo, spec_data.zfe_hi], fmt = 'o', ls = '--', label = 'Data clipped when error > 30%',
+                    color = 'r')
+
+        ax.set_ylabel('Metallicity [$Z_\\odot$]', fontsize = 18)
+
+        ax.set_ylim([0, 1])
+
+        ax.legend(fontsize = 18)
+
+        ax = axs[2]
+
+        ax.plot(bins, cr_prof, label = 'LAMBDA factor', ls = '--', marker = 'o')
+
+        ax.set_ylabel('LAMBDA MOS2', fontsize = 18)
+
+        ax.set_xlabel('Radius [arcmin]', fontsize = 18)
+
+        ax.legend(fontsize = 18)
+
+        ax.set_xlim(left = 1 / 10)
+        ax.set_xscale('log')
+
+        fig.tight_layout()
+
+        fig.subplots_adjust(hspace = 0)
+
+        fig.savefig(out_cfact_pdf)
+
+
+
 
 
     return cf_prof, lf_prof
