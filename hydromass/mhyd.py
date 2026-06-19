@@ -1,6 +1,8 @@
 import logging
 import sys
 import os
+
+import ipdb
 import numpy as np
 import time
 import pytensor.tensor as tt
@@ -39,8 +41,11 @@ from .utility import sb_utils, rads_more
 
 __all__ = ['Run_Mhyd_PyMC3', 'Mhyd']
 
-def Run_Mhyd_PyMC3(Mhyd,model,bkglim=None,nmcmc=1000,fit_bkg=False,back=None,
-                   samplefile=None,nrc=None,nbetas=6,min_beta=0.6, nmore=5,
+def Run_Mhyd_PyMC3(Mhyd, model,bkglim=None,nmcmc=1000,fit_bkg=False,back=None,
+                   samplefile=None,
+                   nrc=None, min_rc=None, max_rc=None,
+                   nbetas=6,min_beta=0.6, max_beta=3,
+                   nmore=5,
                    p0_prior=None, tune=500, dmonly=False, mstar=None, find_map=True,
                    pnt=False, pnt_model='Ettori', rmin=0., rmax=None, p0_type='sb', init='ADVI', target_accept=0.9,
                    fit_elong=False, use_jax=True, wlonly=False, pnt_prior='sim', fit_eta=False, fix_beta_pnt=False, do_ppc=False):
@@ -304,9 +309,10 @@ def Run_Mhyd_PyMC3(Mhyd,model,bkglim=None,nmcmc=1000,fit_bkg=False,back=None,
     #
     #     Kdens_m = calc_density_operator(rref_m / Mhyd.amin2kpc, pardens, Mhyd.amin2kpc, withbkg=False)
 
-    (testval, testbkg, npt, bkgcounts, counts, sb, esb, valid, cf, rin_m, rout_m, rref_m, weights_rout_m, proj_mat, volmat, index_sz, ntm, rad, rmin, rmax,
-     nbin) = sb_utils(Mhyd, fit_bkg = fit_bkg, rmin = rmin, rmax = rmax, bkglim = bkglim, back = back, nrc = nrc,
-                      nbetas = nbetas, min_beta = min_beta, nmore = nmore)
+    (testval, testbkg, npt, bkgcounts, counts, sb, esb, valid, cf, rin_m, rout_m, rref_m, proj_mat, volmat, index_sz, ntm, rad, rmin, rmax,
+     nbin) = sb_utils(Mhyd, fit_bkg = fit_bkg, rmin = rmin, rmax = rmax, bkglim = bkglim, back = back,
+                      nbetas = nbetas, min_beta = min_beta, max_beta = max_beta, nrc = nrc, min_rc = min_rc, max_rc = max_rc,
+                      nmore = nmore)
 
     dlogr = (np.log(rout_m) - np.log(rin_m))
 
@@ -316,7 +322,7 @@ def Run_Mhyd_PyMC3(Mhyd,model,bkglim=None,nmcmc=1000,fit_bkg=False,back=None,
 
         cum_mstar = mstar[:, 1]
 
-        mstar_m_out = np.interp(rout_m, r_mstar, cum_mstar)
+        mstar_m = np.interp(rref_m, r_mstar, cum_mstar)
 
     nptmore = len(rout_m)
 
@@ -348,11 +354,15 @@ def Run_Mhyd_PyMC3(Mhyd,model,bkglim=None,nmcmc=1000,fit_bkg=False,back=None,
 
     with hydro_model:
         # Model parameters
-        allpmod = []
+
 
         initvals = dict()
 
         pymc_vars = dict()
+
+        allpmod = []
+
+        print(model.massmod)
 
         for i in range(model.npar):
 
@@ -403,7 +413,28 @@ def Run_Mhyd_PyMC3(Mhyd,model,bkglim=None,nmcmc=1000,fit_bkg=False,back=None,
 
         if not wlonly:
             # Priors for unknown model parameters
-            coefs = pm.Normal('coefs', mu=testval, sigma=20, shape=npt)
+            if True:
+                coefs = pm.Normal('coefs', mu=testval, sigma=20, shape=npt)
+            else:
+
+                sigma_w = 20#pm.HalfNormal("sigma_w", 10.0)
+                corr_len = 1 #pm.HalfNormal("corr_len", 1)
+
+                # ell_rc = pm.HalfNormal("ell_rc", 1.0)
+                # ell_beta = pm.HalfNormal("ell_beta", 1.0)
+                # #
+                # # dist_pars = Mhyd.dist_rc**2 / ell_rc**2 + Mhyd.dist_beta**2 / ell_beta**2
+                #
+                # dist2 = (
+                #         Mhyd.dist_rc2 / ell_rc ** 2 +
+                #         Mhyd.dist_beta2 / ell_beta ** 2
+                # )
+
+                # cov_w = sigma_w ** 2 * tt.exp(-0.5 * Mhyd.dist_pars2/corr_len**2)
+
+                # cov_w += 1e-6 * tt.eye(npt)
+
+                coefs = pm.MvNormal("coefs", mu = tt.constant(testval), cov = Mhyd.cov_w)
 
             if fit_bkg:
 
@@ -506,39 +537,47 @@ def Run_Mhyd_PyMC3(Mhyd,model,bkglim=None,nmcmc=1000,fit_bkg=False,back=None,
 
                 dens_m_out = pm.math.sqrt(pm.math.dot(Mhyd.Kdens_m_out, al) / cf * Mhyd.transf)  # electron density in cm-3
 
-            mbar_out = 0
+            mbar_rref = 0
             if dmonly:
 
                 nhconv = cgsamu * Mhyd.mu_e * cgskpc ** 3 / Msun  # Msun/kpc^3
 
                 mgas_out = mgas_pm(rin_m, rout_m, dens_m) * nhconv / Mhyd.mfact0
 
+                # Assuming mgas(rref) = (mgas(rin)+mgas(rout)) / 2
+                mgas_rref = tt.concatenate([[mgas_out[0]], (mgas_out[1:] + mgas_out[:-1])]) / 2
+
                 # Add stellar mass if provided
                 if mstar is not None:
 
-                    mbar_out = mgas_out + mstar_m_out / Mhyd.mfact0 / 1e13
+                    mbar_rref = mgas_rref + mstar_m / Mhyd.mfact0 / 1e13
 
                 else:
 
-                    mbar_out = mgas_out
+                    mbar_rref = mgas_rref
+
 
             # Evaluate mass model
             if model.massmod in ['MOND', 'GMOND', 'EMOND']:
 
                 # MOND also needs baryon mass
 
-                assert mbar_out != 0, 'Cannot use MOND/GMOND/EMOND if baryons are not passed. Select dmonly=True and optionally pass mstar'
+                assert mbar_rref != 0, 'Cannot use MOND/GMOND/EMOND if baryons are not passed. Select dmonly=True and optionally pass mstar'
 
-                mass = model.func_pm(rref_m, *pmod, mbar = mbar_out * 1e13 * Mhyd.mfact0) / Mhyd.mfact0 / 1e13
+                mass = model.func_pm(rref_m, *pmod, mbar = mbar_rref * 1e13 * Mhyd.mfact0) / Mhyd.mfact0 / 1e13
 
             else:
 
+
                 mass = Mhyd.mfact * model.func_pm(rref_m, *pmod, delta = model.delta) / Mhyd.mfact0
 
-                mass = mass + mbar_out # This is wrong. Adding something at rref + something at rout
+
+
+
+            tot_mass = mass + mbar_rref # This is wrong. Adding something at rref + something at rout
 
             # Pressure gradient
-            dpres = - mass / rref_m ** 2 * dens_m * (rout_m - rin_m)
+            dpres = - tot_mass / rref_m ** 2 * dens_m * (rout_m - rin_m)
 
             press_out = press00 - pm.math.dot(int_mat, dpres)  # directly returns press_out
 
@@ -624,6 +663,8 @@ def Run_Mhyd_PyMC3(Mhyd,model,bkglim=None,nmcmc=1000,fit_bkg=False,back=None,
                     rmax_spec = rmax
 
                 valspec = np.where(np.logical_and(Mhyd.spec_data.rref_x_am>=rmin_spec, Mhyd.spec_data.rref_x_am<=rmax_spec))
+
+                pm.Deterministic('tproj', tproj)
 
                 T_obs = pm.Normal('kt', mu=tproj[valspec], observed=Mhyd.spec_data.temp_x[valspec], sigma=Mhyd.spec_data.errt_x[valspec])  # temperature likelihood
 
@@ -1213,7 +1254,10 @@ class Mhyd:
                                     )
 
     def run(self, model=None, bkglim=None, nmcmc=1000, fit_bkg=False, back=None,
-            samplefile=None, nrc=None, nbetas=6, min_beta=0.6, nmore=5,
+            samplefile=None,
+            nrc = None, min_rc = None, max_rc = None,
+            nbetas = 6, min_beta = 0.6, max_beta = 3,
+            nmore=5,
             p0_prior=None, tune=500, dmonly=False, mstar=None, find_map=True, pnt=False,
             rmin=None, rmax=None, p0_type='sb', init='ADVI', target_accept=0.9,
             pnt_model='Ettori', fit_elong=False, fit_eta=False, use_jax=True, wlonly=False, pnt_prior='sim',
@@ -1293,9 +1337,8 @@ class Mhyd:
                        fit_bkg=fit_bkg,
                        back=back,
                        samplefile=samplefile,
-                       nrc=nrc,
-                       nbetas=nbetas,
-                       min_beta=min_beta,
+                       nrc = nrc, min_rc = min_rc, max_rc = max_rc,
+                       nbetas = nbetas, min_beta = min_beta, max_beta = max_beta,
                        nmore=nmore,
                        p0_prior=p0_prior,
                        tune=tune,
@@ -1319,7 +1362,10 @@ class Mhyd:
 
 
     def run_forward(self, forward=None, bkglim=None, nmcmc=1000, fit_bkg=False, back=None,
-            samplefile=None, nrc=None, nbetas=6, min_beta=0.6, nmore=5, tune=500, find_map=True, rmin=0, rmax=None, force_positive_mass = False,
+            samplefile=None,
+                    nrc = None, min_rc = None, max_rc = None,
+                    nbetas = 6, min_beta = 0.6, max_beta = 3,
+                    nmore=5, tune=500, find_map=True, rmin=0, rmax=None, force_positive_mass = False,
                     force_convective_stability = False, force_increasing_mass = False, fit_eta=False, do_ppc=True):
 
         '''
@@ -1370,9 +1416,8 @@ class Mhyd:
                           fit_bkg=fit_bkg,
                           back=back,
                           samplefile=samplefile,
-                          nrc=nrc,
-                          nbetas=nbetas,
-                          min_beta=min_beta,
+                          nrc = nrc, min_rc = min_rc, max_rc = max_rc,
+                          nbetas = nbetas, min_beta = min_beta, max_beta = max_beta,
                           nmore=nmore,
                           tune=tune,
                           find_map=find_map,
@@ -1440,7 +1485,10 @@ class Mhyd:
 
 
     def run_GP(self, bkglim=None, nmcmc=1000, fit_bkg=False, back=None,
-            samplefile=None, nrc=None, nbetas=6, min_beta=0.6, nmore=5, tune=500, find_map=True,
+            samplefile=None,
+               nrc = None, min_rc = None, max_rc = None,
+               nbetas = 6, min_beta = 0.6, max_beta = 3
+               , nmore=5, tune=500, find_map=True,
             bin_fact=1.0, smin=None, smax=None, ngauss=100, extend=False, T0extend=None, rmin=None, rmax=None, force_positive_mass = False,
                force_convective_stability = False, force_increasing_mass=False):
 
@@ -1485,9 +1533,8 @@ class Mhyd:
                                 fit_bkg=fit_bkg,
                                 back=back,
                                 samplefile=samplefile,
-                                nrc=nrc,
-                                nbetas=nbetas,
-                                min_beta=min_beta,
+                                nrc = nrc, min_rc = min_rc, max_rc = max_rc,
+                                nbetas = nbetas, min_beta = min_beta, max_beta = max_beta,
                                 nmore=nmore,
                                 tune=tune,
                                 find_map=find_map,
