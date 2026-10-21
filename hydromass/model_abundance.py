@@ -2,6 +2,8 @@ import numpy as np
 from scipy.optimize import minimize
 import pymc as pm
 
+from .model import Model
+
 
 
 def beta_Ab_pm(rad, norm, rc, beta, floor):
@@ -20,24 +22,26 @@ def constant_Ab_np(rad, norm):
     return rad * 0 + norm
 
 
-class Z_Ab_Model:
+class Z_Ab_Model(Model):
     available_models = ['BETA_AB', 'CONSTANT_AB']
 
     @classmethod
     def help(cls):
         print(f'Available Abundance models: {cls.available_models}.')
 
-    def __init__(self, model = 'BETA_AB', start = None, sd = None, limits = None, fix = None):
+    def __init__(self, model = 'BETA_AB', start = None, sd = None, limits = None, fix = None, prior = None):
+
+        self.mod_type = 'ABUNDANCE'
 
         if model not in self.available_models:
             raise ValueError(f'Unknown Iron model {model}. Available mass models: {self.available_models}.')
 
         if model == 'BETA_AB':
-            self.setup_beta_Ab(start = start, sd = sd, limits = limits, fix = fix)
+            self.setup_beta_Ab(start = start, sd = sd, limits = limits, fix = fix, prior = prior)
         elif model == 'CONSTANT_AB':
-            self.setup_constant(start = start, sd = sd, limits = limits, fix = fix)
+            self.setup_constant(start = start, sd = sd, limits = limits, fix = fix, prior = prior)
 
-    def setup_beta_Ab(self, start = None, sd = None, limits = None, fix = None):
+    def setup_beta_Ab(self, start = None, sd = None, limits = None, fix = None, prior = None):
         self.func_pm = beta_Ab_pm
         self.func_np = beta_Ab_np
         self.npar = 4
@@ -56,9 +60,12 @@ class Z_Ab_Model:
         if fix is None:
             fix = [False, False, True, False]
 
-        self.check(start = start, sd = sd, limits = limits, fix = fix)
+        if prior is None:
+            prior = ['TruncatedNormal'] * self.npar
 
-    def setup_constant(self, start = None, sd = None, limits = None, fix = None):
+        self.check(start = start, sd = sd, limits = limits, fix = fix, prior = prior)
+
+    def setup_constant(self, start = None, sd = None, limits = None, fix = None, prior = None):
         self.func_pm = constant_Ab_pm
         self.func_np = constant_Ab_np
         self.npar = 1
@@ -75,19 +82,10 @@ class Z_Ab_Model:
         if fix is None:
             fix = [False]
 
-        self.check(start = start, sd = sd, limits = limits, fix = fix)
+        if prior is None:
+            prior = ['TruncatedNormal'] * self.npar
 
-    def check(self, start = None, sd = None, limits = None, fix = None):
-
-        assert len(start) == self.npar, 'Number of starting parameters does not match function.'
-        assert len(sd) == self.npar, 'Shape of sd does not match function.'
-        assert (limits.shape == (self.npar, 2)), 'Shape of limits does not match function.'
-        assert (len(fix) == self.npar), 'Shape of fix vectory does not match function.'
-
-        self.start = start
-        self.sd = sd
-        self.limits = limits
-        self.fix = fix
+        self.check(start = start, sd = sd, limits = limits, fix = fix, prior = prior)
 
     def quick_fit(self, SpecData):
         def optim_zfe(pars):

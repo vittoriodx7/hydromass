@@ -7,7 +7,7 @@ import pickle
 from astropy.units.decorators import NoneType
 
 from .plots import kt_from_samples, P_from_samples
-from .functions import Model
+from .model_mass import MassModel
 from .nonparametric import calc_gp_operator_lognormal, calc_gp_grad_operator_lognormal, kt_GP_from_samples, P_GP_from_samples, mass_GP_from_samples, prof_GP_hires, Run_NonParametric_PyMC3
 from .forward import kt_forw_from_samples, P_forw_from_samples, Forward
 from .deproject import calc_density_operator, list_params, calc_linear_operator, calc_sb_operator, list_params_density, calc_grad_operator
@@ -295,7 +295,7 @@ def ReloadModel(Mhyd, infile, mstar=None):
 
     delta = modhead['DELTA']
 
-    mod = Model(massmod, delta=delta)
+    mod = MassModel(massmod, delta=delta)
 
     for i in range(mod.npar):
         parname = mod.parnames[i]

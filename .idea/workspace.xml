@@ -5,29 +5,13 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="5521cb6d-2b2a-4738-9850-2cb9dfed795b" name="Changes" comment="somet">
-      <change afterPath="$PROJECT_DIR$/hydromass/conversion_factor_emissivity.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/hydromass/galaxy_object.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/hydromass/likelihoods.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/hydromass/model_abundance.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/hydromass/model_mass.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/hydromass/pyutils.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/hydromass/utility_old.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/inspectionProfiles/Project_Default.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/inspectionProfiles/Project_Default.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/hydromass/__init__.py" beforeDir="false" afterPath="$PROJECT_DIR$/hydromass/__init__.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/hydromass/delta.py" beforeDir="false" afterPath="$PROJECT_DIR$/hydromass/delta.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/hydromass/deproject.py" beforeDir="false" afterPath="$PROJECT_DIR$/hydromass/deproject.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/hydromass/emissivity.py" beforeDir="false" afterPath="$PROJECT_DIR$/hydromass/emissivity.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/hydromass/forward.py" beforeDir="false" afterPath="$PROJECT_DIR$/hydromass/forward.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/hydromass/functions.py" beforeDir="false" afterPath="$PROJECT_DIR$/hydromass/functions.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/hydromass/likelihoods.py" beforeDir="false" afterPath="$PROJECT_DIR$/hydromass/likelihoods.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/hydromass/mhyd.py" beforeDir="false" afterPath="$PROJECT_DIR$/hydromass/mhyd.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/hydromass/mu.py" beforeDir="false" afterPath="$PROJECT_DIR$/hydromass/mean_molecular_weights.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/hydromass/nonparametric.py" beforeDir="false" afterPath="$PROJECT_DIR$/hydromass/nonparametric.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/hydromass/plots.py" beforeDir="false" afterPath="$PROJECT_DIR$/hydromass/plots.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/hydromass/polytropic.py" beforeDir="false" afterPath="$PROJECT_DIR$/hydromass/polytropic.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/hydromass/model_abundance.py" beforeDir="false" afterPath="$PROJECT_DIR$/hydromass/model_abundance.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/hydromass/model_mass.py" beforeDir="false" afterPath="$PROJECT_DIR$/hydromass/model_mass.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/hydromass/save.py" beforeDir="false" afterPath="$PROJECT_DIR$/hydromass/save.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/hydromass/tpdata.py" beforeDir="false" afterPath="$PROJECT_DIR$/hydromass/tpdata.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/hydromass/utility.py" beforeDir="false" afterPath="$PROJECT_DIR$/hydromass/utility.py" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -73,7 +57,7 @@
     "RunOnceActivity.git.unshallow": "true",
     "RunOnceActivity.typescript.service.memoryLimit.init": "true",
     "codeWithMe.voiceChat.enabledByDefault": "false",
-    "git-widget-placeholder": "master",
+    "git-widget-placeholder": "group__update",
     "last_opened_file_path": "/home/vittorio/Downloads/claude-code-jetbrains-plugin-0.1.14-beta.zip",
     "node.js.detected.package.eslint": "true",
     "node.js.detected.package.jshint": "true",

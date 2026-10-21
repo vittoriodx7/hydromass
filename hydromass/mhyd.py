@@ -1,6 +1,10 @@
+import os
+
+os.environ["XLA_FLAGS"] = "--xla_force_host_platform_device_count=4"
+
 import logging
 import sys
-import os
+
 
 import ipdb
 import numpy as np
@@ -11,15 +15,15 @@ import pytensor.tensor as tt
 isjax = False
 
 try:
-    import pymc.sampling.jax as pmjax
+    import jax
+    import numpyro
 
 except ImportError:
-    print('JAX not found, using default sampler')
+    print('JAX/numpyro not found, using default sampler')
 
 else:
     print('We will use the JAX sampler')
     isjax = True
-    import pymc.sampling.jax as pmjax
 
 import pymc as pm
 import arviz as az
@@ -41,6 +45,7 @@ from .pyutils import create_logger, warning
 from .conversion_factor_emissivity import calc_emissivity, ConversionFactor, FitCCFTable
 from .utility import sb_utils, common_utils, spec_utils, mass_utils, ccf_utils, forw_utils, gp_utils
 from .likelihoods import get_density, likelihood_sb, get_metal, likelihood_metal, kt_from_mass, likelihood_kt, get_ccf, kt_from_forw, kt_from_gp
+from .show_fit import plot_likelihood
 
 
 __all__ = ['Run_Mhyd_PyMC3', 'Mhyd']
@@ -904,28 +909,20 @@ def Run_Mhyd_PyMC3(Mhyd, model,bkglim=None,nmcmc=1000,fit_bkg=False,back=None,
 
     Mhyd.logger.info('Running HMC...')
 
+    nuts_sampler = 'numpyro' if (isjax and use_jax) else 'pymc'
+
     with hydro_model:
 
         if find_map:
 
             start = pm.find_MAP(start=initvals)
 
-            if not isjax or not use_jax:
-
-                trace = pm.sample(nmcmc, init=init, initvals=start, tune=tune, target_accept=target_accept)
-            else:
-
-                trace = pmjax.sample_numpyro_nuts(nmcmc, initvals=start, tune=tune, target_accept=target_accept)
-
         else:
 
-            if not isjax or not use_jax:
+            start = None
 
-                trace = pm.sample(nmcmc, init=init, tune=tune, target_accept=target_accept)
-
-            else:
-
-                trace = pmjax.sample_numpyro_nuts(nmcmc, tune=tune, target_accept=target_accept)
+        trace = pm.sample(nmcmc, init=init, initvals=start, tune=tune, target_accept=target_accept,
+                          nuts_sampler=nuts_sampler)
 
         if do_ppc:
             if not wlonly:
@@ -1386,7 +1383,6 @@ class Mhyd:
 
 
     def fit(self,
-            method,
             fit_SB=False, fit_bkg=False, bkglim_amin=None, backval=None,
             fit_Z_Ab=False, model_Z_Ab=None,
             fit_kT=False,
@@ -1402,13 +1398,9 @@ class Mhyd:
             rmin_amin=None, rmax_amin=None,
             p0_prior=None, p0_type='sb',
             num_warmup=1000, num_samples=2000, target_accept=0.95, num_chains=4, nuts_sampler="numpyro",
+            find_map=True,
             ):
         '''
-
-        :param method:
-            Method used to get the 3-dimensional temperature. One of \' MASSMOD\', \' FORW\', \' GP\'.
-            Note: for MASSMOD the total mass is assumed to be: Mtot = Mgas + Mstar + Mother, with Mgas given by the gas mass from the integral of the gas density,
-            Mstar given by star mass component, and Mother given by the sum of models_mass
         :param fit_SB:
             Whether to fit the surface brightness profile or not. Default False.
         :param fit_bkg:
@@ -1433,6 +1425,8 @@ class Mhyd:
         :param cM_relation:
         :param models_mass:
             List of models to fit the non baryonic mass component.
+            The total mass is assumed to be: Mtot = Mgas + Mstar + Mother, with Mgas given by the gas mass from the integral of the gas density,
+            Mstar given by star mass component, and Mother given by the sum of models_mass
         :param mstar:
             Array containing the cumulative stellar mass profile.
         :param model_mstar:
@@ -1460,6 +1454,8 @@ class Mhyd:
             Number of chains to run in parallel. Default 4.
         :param nuts_sampler:
             Sampler used for the fitting. Default numpyro
+        :param find_map:
+            Whether to run a maximum a posteriori fit first to initialize the sampler. Default True
         '''
         if (fit_SB is False) and (fit_kT is False) and (fit_Z_Ab is False) and (fit_SZ is False) and (fit_WL is False):
             raise ValueError('Nothing to do. At least one of [fit_SB, fit_kT, fit_Z_Ab, fit_SZ, fit_WL] must be set to True')
@@ -1476,14 +1472,8 @@ class Mhyd:
 
         # ccf_utils(self, dict_utils)
 
-        if method == 'MASSMOD':
-            mass_utils(self, dict_utils, mstar=mstar, p0_prior=p0_prior, p0_type=p0_type)
-        elif method == 'FORW':
-            forw_utils(self, dict_utils)
-        elif method == 'GP':
-            gp_utils(self, dict_utils)
-        else:
-            raise ValueError(f'{method = } not recognized. Use \'MASSMOD\', \'FORW\', or \'GP\'')
+        mass_utils(self, dict_utils, mstar=mstar, p0_prior=p0_prior, p0_type=p0_type)
+
 
         hydro_model = pm.Model()
         with hydro_model:
@@ -1496,14 +1486,7 @@ class Mhyd:
             if fit_Z_Ab:
                 likelihood_metal(params, model_Z_Ab, self, dict_utils)
 
-            if method == 'MASSMOD':
-                kt_from_mass(params, models_mass, self, dict_utils, mstar=mstar, model_mstar=model_mstar, model_missing_mass=model_missing_mass)
-            elif method == 'FORW':
-                kt_from_forw(params, model_P, self, dict_utils)
-            elif method == 'GP':
-                kt_from_gp(params, models, self, dict_utils)
-            else:
-                raise ValueError(f'{method = } not recognized. Use \'MASSMOD\', \'FORW\', or \'GP\'')
+            kt_from_mass(params, models_mass, self, dict_utils, mstar=mstar, model_mstar=model_mstar, model_missing_mass=model_missing_mass)
 
             if fit_kT:
                 likelihood_kt(params, self, dict_utils)
@@ -1514,14 +1497,30 @@ class Mhyd:
             if fit_SB:
                 likelihood_sb(params, dict_utils, self, fit_bkg=fit_bkg)
 
-        with hydro_model:
-            # start = pm.find_MAP(start=initvals), initvals=start
+        trace_path = os.path.join(self.dir, 'trace.nc')
+        if not os.path.isfile(trace_path):
+            self.logger.info('Starting the sampler...')
 
-            trace = pmjax.sample_numpyro_nuts(num_samples, tune=num_warmup, target_accept=target_accept)
+            if nuts_sampler in ('numpyro', 'blackjax') and not isjax:
+                self.logger.info(f'JAX/{nuts_sampler} not found, falling back to the pymc sampler')
+                nuts_sampler = 'pymc'
 
+            with hydro_model:
+                if find_map:
+                    self.logger.info('Running find_MAP to initialize the sampler...')
+                    start = pm.find_MAP(method='L-BFGS-B', maxeval=5000)
+                else:
+                    start = None
 
+                trace = pm.sample(num_samples, tune=num_warmup, chains=num_chains, target_accept=target_accept, nuts_sampler=nuts_sampler,
+                                  initvals=start)
 
+            az.to_netcdf(trace, trace_path)
+            self.logger.info(f'InferenceData saved to {trace_path}')
 
+        trace = az.from_netcdf(trace_path)
+
+        plot_likelihood(self, trace, dict_utils, fit_SB=fit_SB, fit_kT=fit_kT, fit_Z_Ab=fit_Z_Ab, fit_bkg=fit_bkg)
 
 
 

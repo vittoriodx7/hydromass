@@ -57,22 +57,8 @@ def likelihood_sb(params, dict_utils, Mhyd, fit_bkg = False):
 def get_metal(params, model, Mhyd, dict_utils):
     rref_m = dict_utils['rref_m']
     Mhyd.logger.info('METAL ABUNDANCE PARAMETERS')
+    pmod = pm.math.stack(model.pm_priors(Mhyd.logger), axis = 0)
 
-    allpmod = []
-    pymc_vars = dict()
-    for i in range(model.npar):
-        name = model.parnames[i]
-        if not model.fix[i]:  # Free parameter
-            lim = model.limits[i]
-            Mhyd.logger.info(f'  pm.TruncatedNormal(\'{name}\', mu={model.start[i]}, sigma={model.sd[i]}, lower={lim[0]}, upper={lim[1]})')
-            pymc_vars[name] = pm.TruncatedNormal(name, mu = model.start[i], sigma = model.sd[i], lower = lim[0], upper = lim[1])
-        else:  # Fixed parameter
-            Mhyd.logger.info(f'  pm.Deterministic(\'{name}\', pm.math.constant({model.start[i]}))')
-            pymc_vars[name] = pm.Deterministic(name, pm.math.constant(model.start[i]))
-        allpmod.append(pymc_vars[name])
-
-    pmod = pm.math.stack(allpmod, axis = 0)
-    #
     zfe_model = model.func_pm(rref_m, *pmod)
 
     zfe_model = tt.clip(zfe_model, 0.01, 1.00)
@@ -113,21 +99,7 @@ def kt_from_mass(params, models, Mhyd, dict_utils,
 
     if model_mstar is not None:
         Mhyd.logger.info('STAR MASS PARAMETERS')
-        allpmod = []
-        pymc_vars = dict()
-        for i in range(model_mstar.npar):
-            name = model_mstar.parnames[i]
-            if not model_mstar.fix[i]:  # Free parameter
-                lim = model_mstar.limits[i]
-                Mhyd.logger.info(f'  pm.TruncatedNormal(\'{name}\', mu={model_mstar.start[i]}, sigma={model_mstar.sd[i]}, lower={lim[0]}, upper={lim[1]})')
-                pymc_vars[name] = pm.TruncatedNormal(name, mu = model_mstar.start[i], sigma = model_mstar.sd[i], lower = lim[0], upper = lim[1])
-            else:  # Fixed parameter
-                Mhyd.logger.info(f'  pm.Deterministic(\'{name}\', pm.math.constant({model_mstar.start[i]}))')
-                pymc_vars[name] = pm.Deterministic(name, pm.math.constant(model_mstar.start[i]))
-            allpmod.append(pymc_vars[name])
-
-        pmod = pm.math.stack(allpmod, axis = 0)
-        #
+        pmod = pm.math.stack(model_mstar.pm_priors(Mhyd.logger), axis = 0)
 
         mstar_model_rref = model_mstar.func_pm(rref_m, *pmod)
 
@@ -145,21 +117,7 @@ def kt_from_mass(params, models, Mhyd, dict_utils,
 
     if model_missing_mass is not None:
         Mhyd.logger.info('MISSING MASS PARAMETERS')
-        allpmod = []
-        pymc_vars = dict()
-        for i in range(model_missing_mass.npar):
-            name = model_missing_mass.parnames[i]
-            if not model_missing_mass.fix[i]:  # Free parameter
-                lim = model_missing_mass.limits[i]
-                Mhyd.logger.info(f'  pm.TruncatedNormal(\'{name}\', mu={model_missing_mass.start[i]}, sigma={model_missing_mass.sd[i]}, lower={lim[0]}, upper={lim[1]})')
-                pymc_vars[name] = pm.TruncatedNormal(name, mu = model_missing_mass.start[i], sigma = model_missing_mass.sd[i], lower = lim[0], upper = lim[1])
-            else:  # Fixed parameter
-                Mhyd.logger.info(f'  pm.Deterministic(\'{name}\', pm.math.constant({model_missing_mass.start[i]}))')
-                pymc_vars[name] = pm.Deterministic(name, pm.math.constant(model_missing_mass.start[i]))
-            allpmod.append(pymc_vars[name])
-
-        pmod = pm.math.stack(allpmod, axis = 0)
-        #
+        pmod = pm.math.stack(model_missing_mass.pm_priors(Mhyd.logger), axis = 0)
 
         m_missing_mass_model_rref = model_missing_mass.func_pm(rref_m, *pmod)
     else:
@@ -178,30 +136,7 @@ def kt_from_mass(params, models, Mhyd, dict_utils,
     pmods = []
     for mass_model in models:
         Mhyd.logger.info(f'MASS MODEL {mass_model.massmod} PARAMETERS')
-
-        allpmod = []
-        initvals = dict()
-        pymc_vars = dict()
-        for i in range(mass_model.npar):
-            name = mass_model.parnames[i]
-            if not mass_model.fix[i]:  # Free parameter
-                lim = mass_model.limits[i]
-                if mass_model.massmod == 'EIN3':  # All but Einasto case
-                    Mhyd.logger.info(f'  pm.TruncatedNormal(\'{name}\', mu={mass_model.start[i]}, sigma={mass_model.sd[i]}, lower={lim[0]}, upper={lim[1]})')
-                    pymc_vars[name] = pm.TruncatedNormal(name, mu = mass_model.start[i], sigma = mass_model.sd[i], lower = lim[0], upper = lim[1])
-                elif mass_model.massmod == 'RAR':
-                    Mhyd.logger.info(f'  pm.Normal(\'{name}\', mu={mass_model.start[i]}, sigma={mass_model.sd[i]})')
-                    pymc_vars[name] = pm.Normal(name, mu = mass_model.start[i], sigma = mass_model.sd[i])
-                else:
-                    Mhyd.logger.info(f'  pm.Uniform(\'{name}\', lower={lim[0]}, upper={lim[1]})')
-                    pymc_vars[name] = pm.Uniform(name, lower = lim[0], upper = lim[1])
-                    initvals[name] = mass_model.start[i]
-            else:  # Fixed parameter
-                Mhyd.logger.info(f'  pm.Deterministic(\'{name}\', pm.math.constant({mass_model.start[i]}))')
-                pymc_vars[name] = pm.Deterministic(name, pm.math.constant(mass_model.start[i]))
-            allpmod.append(pymc_vars[name])
-        pmod = pm.math.stack(allpmod, axis = 0)
-        pmods.append(pmod)
+        pmods.append(pm.math.stack(mass_model.pm_priors(Mhyd.logger), axis = 0))
 
     # if len(models) > 1:
     #     Mhyd.logger.info(f'MIXTURE MASS PARAMETERS')

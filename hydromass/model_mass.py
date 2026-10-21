@@ -5,6 +5,7 @@ import pytensor as theano
 import pytensor.tensor as tt
 
 from .constants import const_G_Msun_kpc
+from .model import Model
 
 
 class ArcTan(tt.Op):
@@ -869,7 +870,7 @@ def f_bur_np(xout, pars, delta=200.):
 
     return r200mul ** 3 * fcc * fx
 
-class MassModel:
+class MassModel(Model):
     '''
     Class defining mass models to be passed to the hydromass :class:`hydromass.mhyd.Mhyd` class for optimization.
 
@@ -892,6 +893,8 @@ class MassModel:
     :type limits: numpy.ndarray
     :param fix: 1D array setting whether each parameter of the mass model is fitted (False) or fixed (True). If None, all the parameters are free to vary.
     :type fix: numpy.ndarray
+    :param prior: List setting the prior type of each parameter, one of 'Uniform' (between limits), 'Normal' (start, sd) or 'TruncatedNormal' (start, sd, between limits). If None, a default prior type is set depending on the mass model.
+    :type prior: list
     '''
     available_models = ['NFW', 'ISO', 'EIN2', 'EIN3', 'BUR', 'HER', 'SERSIC', 'RAR', 'EMOND', 'GMOND', 'MISSING_MASS']
 
@@ -899,50 +902,39 @@ class MassModel:
     def help(cls):
         print(f'Available mass models: {cls.available_models}.')
 
-    def __init__(self, massmod, delta = 200., start = None, sd = None, limits = None, fix = None):
+    def __init__(self, massmod, delta = 200., start = None, sd = None, limits = None, fix = None, prior = None):
 
         if massmod not in self.available_models:
             raise ValueError(f'Unknown Mass model {massmod} . Available mass models: {self.available_models}.')
 
         self.massmod = massmod
         self.delta = delta
+        self.mod_type = 'MASSMOD'
 
         if massmod == 'NFW':
-            self.setup_NFW(start = start, sd = sd, limits = limits, fix = fix)
+            self.setup_NFW(start = start, sd = sd, limits = limits, fix = fix, prior = prior)
         elif massmod == 'ISO':
-            self.setup_ISO(start = start, sd = sd, limits = limits, fix = fix)
+            self.setup_ISO(start = start, sd = sd, limits = limits, fix = fix, prior = prior)
         elif massmod == 'EIN2':
-            self.setup_EIN2(start = start, sd = sd, limits = limits, fix = fix)
+            self.setup_EIN2(start = start, sd = sd, limits = limits, fix = fix, prior = prior)
         elif massmod == 'EIN3':
-            self.setup_EIN3(start = start, sd = sd, limits = limits, fix = fix)
+            self.setup_EIN3(start = start, sd = sd, limits = limits, fix = fix, prior = prior)
         elif massmod == 'BUR':
-            self.setup_BUR(start = start, sd = sd, limits = limits, fix = fix)
+            self.setup_BUR(start = start, sd = sd, limits = limits, fix = fix, prior = prior)
         elif massmod == 'HER':
-            self.setup_HER(start = start, sd = sd, limits = limits, fix = fix)
+            self.setup_HER(start = start, sd = sd, limits = limits, fix = fix, prior = prior)
         elif massmod == 'SERSIC':
-            self.setup_SERSIC(start = start, sd = sd, limits = limits, fix = fix)
+            self.setup_SERSIC(start = start, sd = sd, limits = limits, fix = fix, prior = prior)
         elif massmod == 'RAR':
-            self.setup_RAR(start = start, sd = sd, limits = limits, fix = fix)
+            self.setup_RAR(start = start, sd = sd, limits = limits, fix = fix, prior = prior)
         elif massmod == 'MISSING_MASS':
-            self.setup_missing_mass(start = start, sd = sd, limits = limits, fix = fix)
+            self.setup_missing_mass(start = start, sd = sd, limits = limits, fix = fix, prior = prior)
         elif massmod == 'GMOND':
-            self.setup_GMOND(start = start, sd = sd, limits = limits, fix = fix)
+            self.setup_GMOND(start = start, sd = sd, limits = limits, fix = fix, prior = prior)
         elif massmod == 'EMOND':
-            self.setup_EMOND(start = start, sd = sd, limits = limits, fix = fix)
+            self.setup_EMOND(start = start, sd = sd, limits = limits, fix = fix, prior = prior)
 
-    def check(self, start = None, sd = None, limits = None, fix = None):
-
-        assert len(start) == self.npar, 'Number of starting parameters does not match function.'
-        assert len(sd) == self.npar, 'Shape of sd does not match function.'
-        assert (limits.shape == (self.npar, 2)), 'Shape of limits does not match function.'
-        assert (len(fix) == self.npar), 'Shape of fix vectory does not match function.'
-
-        self.start = start
-        self.sd = sd
-        self.limits = limits
-        self.fix = fix
-
-    def setup_NFW(self, start = None, sd = None, limits = None, fix = None):
+    def setup_NFW(self, start = None, sd = None, limits = None, fix = None, prior = None):
         self.func_pm = f_nfw_pm
         self.func_np = f_nfw_np
 
@@ -963,9 +955,12 @@ class MassModel:
         if fix is None:
             fix = [False, False]
 
-        self.check(start = start, sd = sd, limits = limits, fix = fix)
+        if prior is None:
+            prior = ['Uniform'] * self.npar
 
-    def setup_ISO(self, start = None, sd = None, limits = None, fix = None):
+        self.check(start = start, sd = sd, limits = limits, fix = fix, prior = prior)
+
+    def setup_ISO(self, start = None, sd = None, limits = None, fix = None, prior = None):
         self.func_pm = f_iso_pm
         self.func_np = f_iso_np
 
@@ -983,9 +978,12 @@ class MassModel:
         if fix is None:
             fix = [False, False]
 
-        self.check(start = start, sd = sd, limits = limits, fix = fix)
+        if prior is None:
+            prior = ['Uniform'] * self.npar
 
-    def setup_EIN2(self, start = None, sd = None, limits = None, fix = None):
+        self.check(start = start, sd = sd, limits = limits, fix = fix, prior = prior)
+
+    def setup_EIN2(self, start = None, sd = None, limits = None, fix = None, prior = None):
         self.func_pm = f_ein2_pm
         self.func_np = f_ein2_np
 
@@ -1003,9 +1001,12 @@ class MassModel:
         if fix is None:
             fix = [False, False]
 
-        self.check(start = start, sd = sd, limits = limits, fix = fix)
+        if prior is None:
+            prior = ['Uniform'] * self.npar
 
-    def setup_EIN3(self, start = None, sd = None, limits = None, fix = None):
+        self.check(start = start, sd = sd, limits = limits, fix = fix, prior = prior)
+
+    def setup_EIN3(self, start = None, sd = None, limits = None, fix = None, prior = None):
         self.func_pm = f_ein3_pm
         self.func_np = f_ein3_np
 
@@ -1027,9 +1028,12 @@ class MassModel:
         if fix is None:
             fix = [False, False, False]
 
-        self.check(start = start, sd = sd, limits = limits, fix = fix)
+        if prior is None:
+            prior = ['TruncatedNormal'] * self.npar
 
-    def setup_SERSIC(self, start = None, sd = None, limits = None, fix = None):
+        self.check(start = start, sd = sd, limits = limits, fix = fix, prior = prior)
+
+    def setup_SERSIC(self, start = None, sd = None, limits = None, fix = None, prior = None):
         # Using Prugniel & Simien 1997 Eq. B6 approximation for the density of the Sersic model.
         self.func_pm = f_sersic_pm
         self.func_np = f_sersic_np
@@ -1059,9 +1063,12 @@ class MassModel:
             print('Note that in SERSIC modeling, n, b, and alpha are fixed to the n=4 case from Prugniel+1997')
             print('   to change this behaviour change MassModel.fix property')
 
-        self.check(start = start, sd = sd, limits = limits, fix = fix)
+        if prior is None:
+            prior = ['TruncatedNormal'] * self.npar
 
-    def setup_BUR(self, start = None, sd = None, limits = None, fix = None):
+        self.check(start = start, sd = sd, limits = limits, fix = fix, prior = prior)
+
+    def setup_BUR(self, start = None, sd = None, limits = None, fix = None, prior = None):
         self.func_pm = f_bur_pm
         self.func_np = f_bur_np
 
@@ -1079,9 +1086,12 @@ class MassModel:
         if fix is None:
             fix = [False, False]
 
-        self.check(start = start, sd = sd, limits = limits, fix = fix)
+        if prior is None:
+            prior = ['Uniform'] * self.npar
 
-    def setup_HER(self, start = None, sd = None, limits = None, fix = None):
+        self.check(start = start, sd = sd, limits = limits, fix = fix, prior = prior)
+
+    def setup_HER(self, start = None, sd = None, limits = None, fix = None, prior = None):
         self.func_pm = f_her_pm
         self.func_np = f_her_np
 
@@ -1099,9 +1109,12 @@ class MassModel:
         if fix is None:
             fix = [False, False]
 
-        self.check(start = start, sd = sd, limits = limits, fix = fix)
+        if prior is None:
+            prior = ['Uniform'] * self.npar
 
-    def setup_RAR(self, start = None, sd = None, limits = None, fix = None):
+        self.check(start = start, sd = sd, limits = limits, fix = fix, prior = prior)
+
+    def setup_RAR(self, start = None, sd = None, limits = None, fix = None, prior = None):
         self.func_pm = f_phantom_rar_pm
         self.func_np = f_phantom_rar_np
 
@@ -1121,9 +1134,12 @@ class MassModel:
         if fix is None:
             fix = [False]
 
-        self.check(start = start, sd = sd, limits = limits, fix = fix)
+        if prior is None:
+            prior = ['Normal'] * self.npar
 
-    def setup_missing_mass(self, start = None, sd = None, limits = None, fix = None):
+        self.check(start = start, sd = sd, limits = limits, fix = fix, prior = prior)
+
+    def setup_missing_mass(self, start = None, sd = None, limits = None, fix = None, prior = None):
         self.func_pm = f_missing_mass_pm
         self.func_np = f_missing_mass_np
 
@@ -1144,9 +1160,12 @@ class MassModel:
         if fix is None:
             fix = [False, False]
 
-        self.check(start = start, sd = sd, limits = limits, fix = fix)
+        if prior is None:
+            prior = ['TruncatedNormal'] * self.npar
 
-    def setup_GMOND(self, start = None, sd = None, limits = None, fix = None):
+        self.check(start = start, sd = sd, limits = limits, fix = fix, prior = prior)
+
+    def setup_GMOND(self, start = None, sd = None, limits = None, fix = None, prior = None):
         self.func_pm = f_gmond_pm
         self.func_np = f_gmond_np
 
@@ -1168,9 +1187,12 @@ class MassModel:
         if fix is None:
             fix = [False, False, False]
 
-        self.check(start = start, sd = sd, limits = limits, fix = fix)
+        if prior is None:
+            prior = ['Uniform'] * self.npar
 
-    def setup_EMOND(self, start = None, sd = None, limits = None, fix = None):
+        self.check(start = start, sd = sd, limits = limits, fix = fix, prior = prior)
+
+    def setup_EMOND(self, start = None, sd = None, limits = None, fix = None, prior = None):
         self.func_pm = f_emond_pm
         self.func_np = f_emond_np
 
@@ -1193,7 +1215,10 @@ class MassModel:
         if fix is None:
             fix = [False, False, False, False]
 
-        self.check(start = start, sd = sd, limits = limits, fix = fix)
+        if prior is None:
+            prior = ['Uniform'] * self.npar
+
+        self.check(start = start, sd = sd, limits = limits, fix = fix, prior = prior)
 
     #
     # def __call__(self, x, pars):
