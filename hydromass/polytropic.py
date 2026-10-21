@@ -7,7 +7,7 @@ from .deproject import (MyDeprojVol, list_params, calc_linear_operator, calc_sb_
                         calc_grad_operator, calc_sb_operator)
 from .plots import get_coolfunc, plt
 from .functions import ArcTan
-from .utility import rads_more
+from .utility_old import rads_more
 
 __all__ = ['func_poly_rad_pm', 'func_poly_rad_np', 'func_poly_dens_pm', 'func_poly_dens_np', 'gradP_gamman', 'kt_poly_from_samples',
            'P_poly_from_samples', 'mass_poly_from_samples', 'prof_poly_hires', 'Polytropic', 'Run_Polytropic_PyMC3']

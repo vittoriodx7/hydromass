@@ -9,7 +9,7 @@ from astropy.cosmology.units import redshift
 from .constants import cgskpc, cgsG, kev2erg, Msun, cgsamu, const_G_Msun_kpc, year
 from .deproject import MyDeprojVol, calc_density_operator, calc_grad_operator, list_params_density, list_params, calc_linear_operator, calc_sb_operator
 from .plots import get_coolfunc, estimate_T0
-from .utility import sb_utils, dens_utils, rads_more
+from .utility_old import sb_utils, dens_utils, rads_more
 
 __all__ = ['calc_gp_operator', 'calc_gp_operator_lognormal', 'calc_gp_grad_operator', 'calc_gp_grad_operator_lognormal', 'kt_GP_from_samples',
            'P_GP_from_samples', 'mass_GP_from_samples', 'prof_GP_hires', 'Run_NonParametric_PyMC3']
@@ -637,6 +637,10 @@ def prof_GP_hires(Mhyd, rin=None, npt=200, Z=0.3):
 
     t3d = np.dot(GPop, Mhyd.samppar.T)
 
+    dlog_dens_m_dlog_r = np.gradient(np.log(dens_m), axis=0) / np.gradient(np.log(rref_m))[:, np.newaxis]
+
+    dlog_t3d_dlog_r = np.gradient(np.log(t3d), axis=0) / np.gradient(np.log(rref_m))[:, np.newaxis]
+
     p3d = t3d * dens_m
 
     # Mazzotta weights
@@ -656,6 +660,10 @@ def prof_GP_hires(Mhyd, rin=None, npt=200, Z=0.3):
     mtp, mtpl, mtph = np.percentile(tproj, [50., 50. - 68.3 / 2., 50. + 68.3 / 2.], axis=1)
 
     mne, mnel, mneh = np.percentile(dens_m, [50., 50. - 68.3 / 2., 50. + 68.3 / 2.], axis=1)
+
+    mdlog_dens_m_dlog_r, mdlog_dens_m_dlog_rl, mdlog_dens_m_dlog_rh = np.percentile(dlog_dens_m_dlog_r, [50., 50. - 68.3 / 2., 50. + 68.3 / 2.], axis=1)
+
+    mdlog_t3d_dlog_r, mdlog_t3d_dlog_rl, mdlog_t3d_dlog_rh = np.percentile(dlog_t3d_dlog_r, [50., 50. - 68.3 / 2., 50. + 68.3 / 2.], axis=1)
 
     mK, mKl, mKh = np.percentile(K3d, [50., 50. - 68.3 / 2., 50. + 68.3 / 2.], axis=1)
 
@@ -693,7 +701,13 @@ def prof_GP_hires(Mhyd, rin=None, npt=200, Z=0.3):
         "T_COOL_HI": mtch,
         "LAMBDA": mcf,
         "LAMBDA_LO": mcfl,
-        "LAMBDA_HI": mcfh
+        "LAMBDA_HI": mcfh,
+        "DLOG_NE_DLOG_R": mdlog_dens_m_dlog_r,
+        "DLOG_NE_DLOG_R_LO": mdlog_dens_m_dlog_rl,
+        "DLOG_NE_DLOG_R_HI": mdlog_dens_m_dlog_rh,
+        "DLOG_T_DLOG_R": mdlog_t3d_dlog_r,
+        "DLOG_T_DLOG_R_LO": mdlog_t3d_dlog_rl,
+        "DLOG_T_DLOG_R_HI": mdlog_t3d_dlog_rh,
     }
 
     return dict
@@ -701,7 +715,10 @@ def prof_GP_hires(Mhyd, rin=None, npt=200, Z=0.3):
 
 
 def Run_NonParametric_PyMC3(Mhyd, bkglim=None, nmcmc=1000, fit_bkg=False, back=None,
-                   samplefile=None, nrc=None, nbetas=6, min_beta=0.6, nmore=5,
+                   samplefile=None,
+                   nrc = None, min_rc = None, max_rc = None,
+                   nbetas = 6, min_beta = 0.6, max_beta = 3,
+                   nmore=5,
                    tune=500, bin_fact=1.0, smin=None, smax=None, ngauss=100, find_map=True,
                    extend=False, T0extend=None, rmin=0., rmax=None,
                    force_positive_mass = False, force_convective_stability = False, force_increasing_mass=False):
@@ -921,8 +938,9 @@ def Run_NonParametric_PyMC3(Mhyd, bkglim=None, nmcmc=1000, fit_bkg=False, back=N
         #     Kdens_grad = calc_grad_operator(rout_m / Mhyd.amin2kpc, pardens, Mhyd.amin2kpc, withbkg=False)
 
     (testval, testbkg, npt, bkgcounts, counts, sb, esb, valid, cf, rin_m, rout_m, rref_m, proj_mat, volmat, index_sz, ntm, rad, rmin, rmax,
-     nbin) = sb_utils(Mhyd, fit_bkg = fit_bkg, rmin = rmin, rmax = rmax, bkglim = bkglim, back = back, nrc = nrc,
-                      nbetas = nbetas, min_beta = min_beta, nmore = nmore)
+     nbin) = sb_utils(Mhyd, fit_bkg = fit_bkg, rmin = rmin, rmax = rmax, bkglim = bkglim, back = back,
+                      nbetas = nbetas, min_beta = min_beta, max_beta = max_beta, nrc = nrc, min_rc = min_rc, max_rc = max_rc,
+                      nmore = nmore)
 
     rmin_kpc = rmin * Mhyd.amin2kpc
 

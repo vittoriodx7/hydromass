@@ -178,7 +178,7 @@ def f_mond_pm(xout, g_cross, mbar = 0):
 
     g_obs = g_bar / (1 - pm.math.exp(-pm.math.sqrt(g_bar / pm.math.exp(g_cross))))
 
-    return g_obs * xout**2 / const_G_Msun_kpc
+    return (g_obs-g_bar) * xout**2 / const_G_Msun_kpc
 
 def f_mond_np(xout, pars, mbar = 0):
     '''
@@ -195,7 +195,7 @@ def f_mond_np(xout, pars, mbar = 0):
 
     g_obs = g_bar / (1 - np.exp(-np.sqrt(g_bar / np.exp(g_cross[:, np.newaxis]))))
 
-    return g_obs * xout[np.newaxis, :]**2 / const_G_Msun_kpc
+    return (g_obs-g_bar) * xout[np.newaxis, :]**2 / const_G_Msun_kpc
 
 def f_gmond_pm(xout, log_C, log_g_0, sigma_g, mbar = 0):
     '''
@@ -299,7 +299,7 @@ def f_emond_np(xout, pars, mbar = 0):
 
     return np.exp(log_g_obs) * xout[np.newaxis, :] ** 2 / const_G_Msun_kpc
 
-def f_nfw_sersic_pm(xout, c200_nfw, r200_nfw, c200_sersic, r200_sersic, b, n, alpha, delta=200.):
+def f_sersic_pm(xout, c200_sersic, r200_sersic, b, n, alpha, delta=200.):
     '''
     Theano function for the NFW + Sersic mass model. Sersic model from Prugniel+1997 approximation.
     Eq. B6 in https://articles.adsabs.harvard.edu/pdf/1997A%26A...321..111P
@@ -361,23 +361,13 @@ def f_nfw_sersic_pm(xout, c200_nfw, r200_nfw, c200_sersic, r200_sersic, b, n, al
 
     massmod_sersic = r200_sersic ** 3 * fcc * fx
 
-    # Now NFW
-
-    fcc = delta / 3. * c200_nfw ** 3 / (pm.math.log(1. + c200_nfw) - c200_nfw / (1. + c200_nfw))
-
-    x = xout / r200_nfw * c200_nfw
-
-    fx = pm.math.log(1. + x) - x / (1. + x)
-
-    massmod_nfw = r200_nfw ** 3 * fcc / c200_nfw ** 3 * fx
-
-    return  massmod_sersic + massmod_nfw
+    return  massmod_sersic
 
 
 
-def f_nfw_sersic_np(xout, pars, delta=200., return_separate = False):
+def f_sersic_np(xout, pars, delta=200.):
     '''
-    Numpy function for the NFW + Sersic mass model (see :func:`hydromass.functions.f_nfw_sersic_pm`)
+    Numpy function for the NFW + Sersic mass model (see :func:`hydromass.functions.f_sersic_pm`)
 
     :param xout: Radius
     :type xout: numpy.ndarray
@@ -390,19 +380,15 @@ def f_nfw_sersic_np(xout, pars, delta=200., return_separate = False):
 
     '''
 
-    c200_nfw = pars[:, 0]
+    c200_sersic = pars[:, 0]
 
-    r200_nfw = pars[:, 1]
+    r200_sersic = pars[:, 0]
 
-    c200_sersic = pars[:, 2]
+    b = pars[:, 2]
 
-    r200_sersic = pars[:, 3]
+    n = pars[:, 3]
 
-    b = pars[:, 4]
-
-    n = pars[:, 5]
-
-    alpha = pars[:, 6]
+    alpha = pars[:, 4]
 
     # Sersic first: note that it is just EIN3 but with extra renaming, e.g. 2/alpha=2*mu=bn, alpha=1/n
     fcc = delta / 3. * c200_sersic ** 3 / (np.log(1. + c200_sersic) - c200_sersic / (1. + c200_sersic))
@@ -425,23 +411,7 @@ def f_nfw_sersic_np(xout, pars, delta=200., return_separate = False):
 
     massmod_sersic = r200_sersic[:, np.newaxis] ** 3 * fcc[:, np.newaxis] * fx
 
-    # Now NFW
-
-    fcc = delta / 3. * c200_nfw ** 3 / (np.log(1. + c200_nfw) - c200_nfw / (1. + c200_nfw))
-
-    x = xout[np.newaxis, :] / r200_nfw[:, np.newaxis] * c200_nfw[:, np.newaxis]
-
-    fx = np.log(1. + x) - x / (1. + x)
-
-    massmod_nfw = r200_nfw[:, np.newaxis] ** 3 * fcc[:, np.newaxis] / c200_nfw[:, np.newaxis] ** 3 * fx
-
-    if not return_separate:
-
-        return  massmod_sersic + massmod_nfw
-
-    else:
-
-        return massmod_sersic + massmod_nfw, massmod_nfw, massmod_sersic
+    return  massmod_sersic
 
 def f_ein2_np(xout, pars, delta=200.):
     '''
@@ -845,8 +815,342 @@ def f_bur_np(xout, pars, delta=200.):
 
     return r200mul ** 3 * fcc * fx
 
-
 class Model:
+    '''
+    Class defining mass models to be passed to the hydromass :class:`hydromass.mhyd.Mhyd` class for optimization.
+
+    :param massmod:
+        Name of the chosen mass model. Currently available mass models are:
+            - 'NFW': Navarro-Frenk-White (1996) model, :func:`hydromass.functions.f_nfw_pm`
+            - 'EIN2': Analytic 2-parameter Einasto (1965) model with :math:`\\alpha=0.2` (Mamon & Lokas 2005), :func:`hydromass.functions.f_ein2_pm`
+            - 'EIN3': Numerically integrated 3-parameter Einasto (1965) model with free :math:`\alpha`, :func:`hydromass.functions.f_ein3_pm`
+            - 'HER': Hernquist (1990) model, :func:`hydromass.functions.f_her_pm`
+            - 'ISO': Cored isothermal sphere model (King 1962), :func:`hydromass.functions.f_iso_pm`
+            - 'BUR': Salucci & Burkert (2000) model, :func:`hydromass.functions.f_bur_pm`
+    :type massmod: str
+    :param delta: Chosen fit overdensity. Defaults to 200
+    :type delta: float
+    :param start: 1D array containing the central values of the Gaussian prior on the model parameters. If None, the priors are set automatically to "sensible" values (for the galaxy cluster case...)
+    :type start: numpy.ndarray
+    :param sd: 1D array containing the standard deviations of the Gaussian prior on the model parameters. If None, weak priors are set automatically to remain within "sensible" values
+    :type sd: numpy.ndarray
+    :param limits: 2D array including the upper and lower boundaries of the parameter values. If None, the boundaries are set automatically to remain within "sensible" values
+    :type limits: numpy.ndarray
+    :param fix: 1D array setting whether each parameter of the mass model is fitted (False) or fixed (True). If None, all the parameters are free to vary.
+    :type fix: numpy.ndarray
+    '''
+    available_models = ['NFW', 'ISO', 'EIN2', 'EIN3', 'BUR', 'HER', 'SERSIC', 'RAR', 'EMOND', 'GMOND', 'MISSING_MASS']
+
+    @classmethod
+    def help(cls):
+        print(f'Available mass models: {cls.available_models}.')
+
+    def __init__(self, massmod, delta = 200., start = None, sd = None, limits = None, fix = None):
+
+        if massmod not in self.available_models:
+            raise ValueError(f'Unknown Iron model {massmod} . Available mass models: {self.available_models}.')
+
+        self.massmod = massmod
+        self.delta = delta
+
+        if massmod == 'NFW':
+            self.setup_NFW(start = start, sd = sd, limits = limits, fix = fix)
+        elif massmod == 'ISO':
+            self.setup_ISO(start = start, sd = sd, limits = limits, fix = fix)
+        elif massmod == 'EIN2':
+            self.setup_EIN2(start = start, sd = sd, limits = limits, fix = fix)
+        elif massmod == 'EIN3':
+            self.setup_EIN3(start = start, sd = sd, limits = limits, fix = fix)
+        elif massmod == 'BUR':
+            self.setup_BUR(start = start, sd = sd, limits = limits, fix = fix)
+        elif massmod == 'HER':
+            self.setup_HER(start = start, sd = sd, limits = limits, fix = fix)
+        elif massmod == 'SERSIC':
+            self.setup_SERSIC(start = start, sd = sd, limits = limits, fix = fix)
+        elif massmod == 'RAR':
+            self.setup_RAR(start = start, sd = sd, limits = limits, fix = fix)
+        elif massmod == 'MISSING_MASS':
+            self.setup_missing_mass(start = start, sd = sd, limits = limits, fix = fix)
+        elif massmod == 'GMOND':
+            self.setup_GMOND(start = start, sd = sd, limits = limits, fix = fix)
+        elif massmod == 'EMOND':
+            self.setup_EMOND(start = start, sd = sd, limits = limits, fix = fix)
+
+    def check(self, start = None, sd = None, limits = None, fix = None):
+
+        assert len(start) == self.npar, 'Number of starting parameters does not match function.'
+        assert len(sd) == self.npar, 'Shape of sd does not match function.'
+        assert (limits.shape == (self.npar, 2)), 'Shape of limits does not match function.'
+        assert (len(fix) == self.npar), 'Shape of fix vectory does not match function.'
+
+        self.start = start
+        self.sd = sd
+        self.limits = limits
+        self.fix = fix
+
+    def setup_NFW(self, start = None, sd = None, limits = None, fix = None):
+        self.func_pm = f_nfw_pm
+        self.func_np = f_nfw_np
+
+        self.rho_pm = rho_nfw_cr
+        self.rho_np = rho_nfw_cr_np
+
+        self.npar = 2
+        self.parnames = ['cdelta', 'rdelta']
+
+        if start is None:
+            start = [4., 1000.]
+        if sd is None:
+            sd = [4., 1000.]
+        if limits is None:
+            limits = np.empty((self.npar, 2))
+            limits[0] = [0.5, 15.]
+            limits[1] = [100., 3000.]
+        if fix is None:
+            fix = [False, False]
+
+        self.check(start = start, sd = sd, limits = limits, fix = fix)
+
+    def setup_ISO(self, start = None, sd = None, limits = None, fix = None):
+        self.func_pm = f_iso_pm
+        self.func_np = f_iso_np
+
+        self.npar = 2
+        self.parnames = ['cdelta', 'rdelta']
+
+        if start is None:
+            start = [7., 440.]
+        if sd is None:
+            sd = [4., 200.]
+        if limits is None:
+            limits = np.empty((self.npar, 2))
+            limits[0] = [1., 30.]
+            limits[1] = [50., 2000.]
+        if fix is None:
+            fix = [False, False]
+
+        self.check(start = start, sd = sd, limits = limits, fix = fix)
+
+    def setup_EIN2(self, start = None, sd = None, limits = None, fix = None):
+        self.func_pm = f_ein2_pm
+        self.func_np = f_ein2_np
+
+        self.npar = 2
+        self.parnames = ['cdelta', 'rdelta']
+
+        if start is None:
+            start = [1.8, 700.]
+        if sd is None:
+            sd = [1.5, 300.]
+        if limits is None:
+            limits = np.empty((self.npar, 2))
+            limits[0] = [0., 5.]
+            limits[1] = [100., 1800.]
+        if fix is None:
+            fix = [False, False]
+
+        self.check(start = start, sd = sd, limits = limits, fix = fix)
+
+    def setup_EIN3(self, start = None, sd = None, limits = None, fix = None):
+        self.func_pm = f_ein3_pm
+        self.func_np = f_ein3_np
+
+        self.npar = 3
+        self.parnames = ['cdelta', 'rdelta', 'mu']
+
+        self.rho_pm = rho_ein3_pm
+        self.rho_np = rho_ein3_np
+
+        if start is None:
+            start = [1.8, 700., 5.]
+        if sd is None:
+            sd = [1.5, 300., 3.]
+        if limits is None:
+            limits = np.empty((self.npar, 2))
+            limits[0] = [0., 5.]
+            limits[1] = [100., 1800.]
+            limits[2] = [0., 20.]
+        if fix is None:
+            fix = [False, False, False]
+
+        self.check(start = start, sd = sd, limits = limits, fix = fix)
+
+    def setup_SERSIC(self, start = None, sd = None, limits = None, fix = None):
+        # Using Prugniel & Simien 1997 Eq. B6 approximation for the density of the Sersic model.
+        self.func_pm = f_sersic_pm
+        self.func_np = f_sersic_np
+
+        self.npar = 5
+        self.parnames = ['cdelta_sersic', 'rdelta_sersic', 'b', 'n', 'alpha']
+
+        self.rho_pm = None  # rho_ein3_pm
+        self.rho_np = None  # rho_ein3_np
+
+        if start is None:
+            # n = 4
+            # b = 2n - 1/3 + 0.009876/n = 7.669135666666667
+            # alpha = 1 - 1/(2n) = 0.875
+            start = [8, 0.5, 7.669135666666667, 4., 0.875]
+        if sd is None:
+            sd = [6., 50., 4., 4., 1.]
+        if limits is None:
+            limits = np.empty((self.npar, 2))
+            limits[0] = [1., 100.]
+            limits[1] = [0., 100.]
+            limits[2] = [0., 14.]
+            limits[3] = [1., 10.]
+            limits[4] = [0., 3.]
+        if fix is None:
+            fix = [False, False, True, True, True]
+            print('Note that in SERSIC modeling, n, b, and alpha are fixed to the n=4 case from Prugniel+1997')
+            print('   to change this behaviour change MassModel.fix property')
+
+        self.check(start = start, sd = sd, limits = limits, fix = fix)
+
+    def setup_BUR(self, start = None, sd = None, limits = None, fix = None):
+        self.func_pm = f_bur_pm
+        self.func_np = f_bur_np
+
+        self.npar = 2
+        self.parnames = ['cdelta', 'rdelta']
+
+        if start is None:
+            start = [4.5, 200.]
+        if sd is None:
+            sd = [3., 100.]
+        if limits is None:
+            limits = np.empty((self.npar, 2))
+            limits[0] = [0., 20.]
+            limits[1] = [20., 800.]
+        if fix is None:
+            fix = [False, False]
+
+        self.check(start = start, sd = sd, limits = limits, fix = fix)
+
+    def setup_HER(self, start = None, sd = None, limits = None, fix = None):
+        self.func_pm = f_her_pm
+        self.func_np = f_her_np
+
+        self.npar = 2
+        self.parnames = ['cdelta', 'rdelta']
+
+        if start is None:
+            start = [1.9, 1000.]
+        if sd is None:
+            sd = [2., 400.]
+        if limits is None:
+            limits = np.empty((self.npar, 2))
+            limits[0] = [0., 6.]
+            limits[1] = [200., 2500.]
+        if fix is None:
+            fix = [False, False]
+
+        self.check(start = start, sd = sd, limits = limits, fix = fix)
+
+    def setup_RAR(self, start = None, sd = None, limits = None, fix = None):
+        self.func_pm = f_phantom_rar_pm
+        self.func_np = f_phantom_rar_np
+
+        self.rho_pm = None
+        self.rho_np = None
+
+        self.npar = 1
+        self.parnames = ['g_cross']
+
+        if start is None:
+            start = [np.log(1.2e-8)]
+        if sd is None:
+            sd = [0.2]
+        if limits is None:
+            limits = np.empty((self.npar, 2))
+            limits[0] = [-23., -14.]
+        if fix is None:
+            fix = [False]
+
+        self.check(start = start, sd = sd, limits = limits, fix = fix)
+
+    def setup_missing_mass(self, start = None, sd = None, limits = None, fix = None):
+        self.func_pm = f_missing_mass_pm
+        self.func_np = f_missing_mass_np
+
+        self.rho_pm = None
+        self.rho_np = None
+
+        self.npar = 2
+        self.parnames = ['log M_tot,miss', 'rs_miss']
+
+        if start is None:
+            start = [7, 100]
+        if sd is None:
+            sd = [10, 500]
+        if limits is None:
+            limits = np.empty((self.npar, 2))
+            limits[0] = [0, 50]
+            limits[1] = [10, 10000]
+        if fix is None:
+            fix = [False, False]
+
+        self.check(start = start, sd = sd, limits = limits, fix = fix)
+
+    def setup_GMOND(self, start = None, sd = None, limits = None, fix = None):
+        self.func_pm = f_gmond_pm
+        self.func_np = f_gmond_np
+
+        self.rho_pm = None
+        self.rho_np = None
+
+        self.npar = 3
+        self.parnames = ['log_C', 'log_g_0', 'sigma_g']
+
+        if start is None:
+            start = [np.log(1e-4), np.log(1.2e-8), 2]
+        if sd is None:
+            sd = [2., 2., 2.]
+        if limits is None:
+            limits = np.empty((self.npar, 2))
+            limits[0] = [np.log(1e-5), np.log(1e-3)]
+            limits[1] = [-23., -14.]
+            limits[2] = [0.1, 5.]
+        if fix is None:
+            fix = [False, False, False]
+
+        self.check(start = start, sd = sd, limits = limits, fix = fix)
+
+    def setup_EMOND(self, start = None, sd = None, limits = None, fix = None):
+        self.func_pm = f_emond_pm
+        self.func_np = f_emond_np
+
+        self.rho_pm = None
+        self.rho_np = None
+
+        self.npar = 4
+        self.parnames = ['alpha1', 'alpha2', 'log_g1', 'log_g2']
+
+        if start is None:
+            start = [1.4, -1.2, np.log(2.3e-8), np.log(1.2e-9)]
+        if sd is None:
+            sd = [2., 2., 2., 2.]
+        if limits is None:
+            limits = np.empty((self.npar, 2))
+            limits[0] = [-1., 3.]
+            limits[1] = [-3., 1.]
+            limits[2] = [-23., -14.]
+            limits[3] = [-23., -14.]
+        if fix is None:
+            fix = [False, False, False, False]
+
+        self.check(start = start, sd = sd, limits = limits, fix = fix)
+
+    #
+    # def __call__(self, x, pars):
+    #
+    #     return self.func_pm(x, *pars)
+
+    def __call__(self, x, pars):
+
+        return self.func_np(x, *pars, delta = self.delta)
+
+class ModelOld:
     '''
     Class defining mass models to be passed to the hydromass :class:`hydromass.mhyd.Mhyd` class for optimization.
 
@@ -886,7 +1190,7 @@ class Model:
             self.parnames = ['cdelta', 'rdelta']
 
             if start is None:
-                self.start = [4., 2000.]
+                start = [4., 2000.]
             else:
                 try:
                     assert (len(start) == self.npar)
@@ -894,11 +1198,11 @@ class Model:
                     print('Number of starting parameters does not match function.')
                     return
 
-                self.start = start
+            self.start = start
 
             if sd is None:
 
-                self.sd = [2., 500.]
+                sd = [2., 500.]
 
             else:
 
@@ -908,7 +1212,7 @@ class Model:
                     print('Shape of sd does not match function.')
                     return
 
-                self.sd = sd
+            self.sd = sd
 
             if limits is None:
 
@@ -926,9 +1230,11 @@ class Model:
                     print('Shape of limits does not match function.')
                     return
 
+            self.limits = limits
+
             if fix is None:
 
-                self.fix = [False, False]
+                fix = [False, False]
 
             else:
 
@@ -938,7 +1244,7 @@ class Model:
                     print('Shape of fix vectory does not match function.')
                     return
 
-                self.fix = fix
+            self.fix = fix
 
 
         elif massmod == 'ISO':
@@ -1150,17 +1456,17 @@ class Model:
 
                 self.fix = fix
 
-        elif massmod == 'NFW+SERSIC':
+        elif massmod == 'SERSIC':
 
             # Using Prugniel & Simien 1997 Eq. B6 approximation for the density of the Sersic model.
 
-            func_pm = f_nfw_sersic_pm
+            func_pm = f_sersic_pm
 
-            func_np = f_nfw_sersic_np
+            func_np = f_sersic_np
 
-            self.npar = 7
+            self.npar = 5
 
-            self.parnames = ['cdelta_nfw', 'rdelta_nfw', 'cdelta_sersic', 'rdelta_sersic', 'b', 'n', 'alpha']
+            self.parnames = ['cdelta_sersic', 'rdelta_sersic', 'b', 'n', 'alpha']
 
             self.rho_pm = None # rho_ein3_pm
 
@@ -1170,7 +1476,7 @@ class Model:
                 # n = 4
                 # b = 2n - 1/3 + 0.009876/n = 7.669135666666667
                 # alpha = 1 - 1/(2n) = 0.875
-                self.start = [4., 1000., 8, 0.5, 7.669135666666667, 4., 0.875]
+                self.start = [8, 0.5, 7.669135666666667, 4., 0.875]
             else:
                 try:
                     assert (len(start) == self.npar)
@@ -1182,7 +1488,7 @@ class Model:
 
             if sd is None:
 
-                self.sd = [2., 500., 6., 50., 4., 4., 1.]
+                self.sd = [6., 50., 4., 4., 1.]
 
             else:
 
@@ -1198,19 +1504,15 @@ class Model:
 
                 limits = np.empty((self.npar, 2))
 
-                limits[0] = [0., 15.]
+                limits[0] = [4., 100.]
 
-                limits[1] = [100., 1800.]
+                limits[1] = [0., 100.]
 
-                limits[2] = [4., 100.]
+                limits[2] = [0., 14.]
 
-                limits[3] = [0., 100.]
+                limits[3] = [1., 10.]
 
-                limits[4] = [0., 14.]
-
-                limits[5] = [1., 10.]
-
-                limits[6] = [0., 3.]
+                limits[4] = [0., 3.]
 
             else:
 
@@ -1225,9 +1527,9 @@ class Model:
 
             if fix is None:
 
-                self.fix = [False, False, False, False, True, True, True]
+                self.fix = [False, False, True, True, True]
 
-                print('Note that in NFW+SERSIC modeling, n, b, and alpha are fixed to the n=4 case from Prugniel+1997')
+                print('Note that in SERSIC modeling, n, b, and alpha are fixed to the n=4 case from Prugniel+1997')
                 print('   to change this behaviour change Model.fix property')
 
             else:
@@ -1604,3 +1906,11 @@ class Model:
     def __call__(self, x, pars):
 
         return self.func_np(x, *pars, delta=self.delta)
+
+
+
+
+
+
+
+

@@ -8,7 +8,6 @@ import time
 import pytensor.tensor as tt
 
 
-
 isjax = False
 
 try:
@@ -34,10 +33,15 @@ from .constants import cgsamu, cgskpc, Msun, y_prefactor, kev2erg, cgsMpc, cgsG
 from .emissivity import calc_emissivity, variable_ccf
 from .pnt import get_data_file_path, alpha_turb_pm, NPmodel
 from .polytropic import Run_Polytropic_PyMC3
-from .mu import mean_molecular_weights
+from .mean_molecular_weights import mean_molecular_weights
 from .save import SaveModel, SaveForward, SaveGP
 from .wl import WLmodel
-from .utility import sb_utils, rads_more
+# from .utility_old import sb_utils, rads_more
+from .pyutils import create_logger, warning
+from .conversion_factor_emissivity import calc_emissivity, ConversionFactor, FitCCFTable
+from .utility import sb_utils, common_utils, spec_utils, mass_utils, ccf_utils, forw_utils, gp_utils
+from .likelihoods import get_density, likelihood_sb, get_metal, likelihood_metal, kt_from_mass, likelihood_kt, get_ccf, kt_from_forw, kt_from_gp
+
 
 __all__ = ['Run_Mhyd_PyMC3', 'Mhyd']
 
@@ -46,9 +50,10 @@ def Run_Mhyd_PyMC3(Mhyd, model,bkglim=None,nmcmc=1000,fit_bkg=False,back=None,
                    nrc=None, min_rc=None, max_rc=None,
                    nbetas=6,min_beta=0.6, max_beta=3,
                    nmore=5,
-                   p0_prior=None, tune=500, dmonly=False, mstar=None, find_map=True,
+                   p0_prior: tuple  | None=None, tune=500, dmonly=False, mstar=None, find_map=True,
                    pnt=False, pnt_model='Ettori', rmin=0., rmax=None, p0_type='sb', init='ADVI', target_accept=0.9,
-                   fit_elong=False, use_jax=True, wlonly=False, pnt_prior='sim', fit_eta=False, fix_beta_pnt=False, do_ppc=False):
+                   fit_elong=False, use_jax=True, wlonly=False, pnt_prior='sim', fit_eta=False, fix_beta_pnt=False, do_ppc=False,
+                   cM_relation = False):
     """
 
     Set up hydrostatic mass model and optimize with PyMC3. The routine takes a parametric mass model as input and integrates the hydrostatic equilibrium equation to predict the 3D pressure profile:
@@ -313,6 +318,8 @@ def Run_Mhyd_PyMC3(Mhyd, model,bkglim=None,nmcmc=1000,fit_bkg=False,back=None,
      nbin) = sb_utils(Mhyd, fit_bkg = fit_bkg, rmin = rmin, rmax = rmax, bkglim = bkglim, back = back,
                       nbetas = nbetas, min_beta = min_beta, max_beta = max_beta, nrc = nrc, min_rc = min_rc, max_rc = max_rc,
                       nmore = nmore)
+    # np.savez('rout', rout_m=rout_m, rin_m=rin_m, ntm=ntm, index_sz=index_sz, psfmat = Mhyd.sz_data.psfmat)
+    # sys.exit()
 
     dlogr = (np.log(rout_m) - np.log(rin_m))
 
@@ -351,6 +358,115 @@ def Run_Mhyd_PyMC3(Mhyd, model,bkglim=None,nmcmc=1000,fit_bkg=False,back=None,
     if Mhyd.veldata is not None and not pnt:
 
         Mhyd.logger.info('Warning: velocity data were provided but pnt is set to False. The velocity data will be ignored.')
+
+    if cM_relation:
+
+        import jax.numpy as jnp
+        from colossus.halo import concentration
+        from colossus.cosmology import cosmology
+
+
+        # sigma8 = 0.811
+        # ns = 0.965
+        # colossus_cosmo = cosmology.fromAstropy(
+        #     Mhyd.cosmo,
+        #     sigma8=sigma8,
+        #     ns=ns,
+        #     cosmo_name='custom_from_astropy'
+        # )
+        #
+        #
+        # colossus_cosmo.matterPowerSpectrumModel = 'eisenstein98'
+
+        cosmology.setCosmology('planck18')
+
+        from pytensor.graph.op import Op
+        from pytensor.graph.basic import Apply
+        from pytensor.link.jax.dispatch import jax_funcify
+        import jax
+        import jax.numpy as jnp
+        from scipy.interpolate import interp1d
+        from colossus.halo import concentration
+
+        class ColossusIshiyamaGridOp(Op):
+            def __init__(self, m_min=1e13, m_max=5e15, z_val=0.0, num_m=500, cosmo_h=0.6774):
+                super().__init__()
+                # 1. Pre-compute log-space grid using Colossus
+                self.m_grid = np.logspace(np.log10(m_min), np.log10(m_max), num_m)
+                self.c_grid = concentration.concentration(
+                    self.m_grid * cosmo_h,
+                    mdef='500c',
+                    z=z_val,
+                    model='ishiyama21'
+                )
+
+                self.log_m_grid = np.log10(self.m_grid)
+                self.log_c_grid = np.log10(self.c_grid)
+
+                # CPU 1D Interpolator (for non-JAX PyMC sampling)
+                self.cpu_interp = interp1d(
+                    self.log_m_grid,
+                    self.log_c_grid,
+                    kind='linear',
+                    fill_value='extrapolate'
+                )
+
+            def make_node(self, m500):
+                m500 = tt.as_tensor_variable(m500)
+                return Apply(self, [m500], [m500.type()])
+
+            def perform(self, node, inputs, outputs):
+                m500_val = inputs[0]
+                log_m = np.log10(m500_val)
+                log_c = self.cpu_interp(log_m)
+                outputs[0][0] = np.array(10 ** log_c, dtype=np.float64)
+
+            def grad(self, inputs, g_outputs):
+                (m500,) = inputs
+                (g_out,) = g_outputs
+
+                # Finite difference gradient on the interpolated grid for PyMC C-backend
+                grad_op = ColossusIshiyamaGridGradOp(self)
+                return [g_out * grad_op(m500)]
+
+        class ColossusIshiyamaGridGradOp(Op):
+            def __init__(self, main_op):
+                super().__init__()
+                self.main_op = main_op
+
+            def make_node(self, m500):
+                m500 = tt.as_tensor_variable(m500)
+                return Apply(self, [m500], [m500.type()])
+
+            def perform(self, node, inputs, outputs):
+                m500_val = inputs[0]
+                eps = m500_val * 1e-5
+                c_plus = 10 ** self.main_op.cpu_interp(np.log10(m500_val + eps))
+                c_minus = 10 ** self.main_op.cpu_interp(np.log10(m500_val - eps))
+                outputs[0][0] = np.array((c_plus - c_minus) / (2 * eps), dtype=np.float64)
+
+        # 2. Register pure JAX dispatch (Runs entirely on JAX/XLA at maximum speed)
+        @jax_funcify.register(ColossusIshiyamaGridOp)
+        def jax_funcify_ColossusIshiyamaGridOp(op, **kwargs):
+            log_m_grid_jax = jnp.array(op.log_m_grid)
+            log_c_grid_jax = jnp.array(op.log_c_grid)
+
+            def jax_colossus_interp(m500):
+                log_m = jnp.log10(m500)
+                log_c = jnp.interp(log_m, log_m_grid_jax, log_c_grid_jax)
+                return 10 ** log_c
+
+            return jax_colossus_interp
+
+        colossus_grid_op = ColossusIshiyamaGridOp(
+            m_min=1e13,
+            m_max=5e15,
+            z_val=Mhyd.redshift,
+            num_m=500,
+            cosmo_h=Mhyd.cosmo.h
+        )
+
+
 
     with hydro_model:
         # Model parameters
@@ -401,7 +517,7 @@ def Run_Mhyd_PyMC3(Mhyd, model,bkglim=None,nmcmc=1000,fit_bkg=False,back=None,
         if fit_elong:
             # Prior on the line-of-sight elongation parameter
             elongation = pm.TruncatedNormal('elong', mu=1.0, sigma=0.2, lower=0.1, upper=10)
-
+            Mhyd.logger.info("pm.TruncatedNormal('elong', mu=1, sigma=2, lower=0.1, upper=10)")
         else:
             elongation = 1
 
@@ -410,6 +526,25 @@ def Run_Mhyd_PyMC3(Mhyd, model,bkglim=None,nmcmc=1000,fit_bkg=False,back=None,
             eta = pm.Uniform('eta', lower=0.2, upper=5)
         else:
             eta = 1
+
+
+        if cM_relation:
+            if model.massmod == 'NFW':
+                Mhyd.logger.info('Using concentration mass relation (Ishiyama21)')
+
+                c500 = pymc_vars['cdelta']
+                r500 = pymc_vars['rdelta']
+                m500 = 500 * Mhyd.rho_cz * 4 / 3 * np.pi * (r500/1000)**3
+                c500c_ishiyama = colossus_grid_op(m500)
+
+
+                pm.Potential(
+                    "cM_relation",
+                    pm.logp(
+                        pm.Normal.dist(mu = pm.math.log(c500c_ishiyama), sigma = 0.23),
+                        pm.math.log(c500)
+                    )
+                )
 
         if not wlonly:
             # Priors for unknown model parameters
@@ -438,7 +573,7 @@ def Run_Mhyd_PyMC3(Mhyd, model,bkglim=None,nmcmc=1000,fit_bkg=False,back=None,
 
             if fit_bkg:
 
-                bkgd = pm.Normal('bkg', mu=testbkg, sigma=0.05, shape=1) # in case fit_bkg = False this is not fitted
+                bkgd = pm.Normal('bkg', mu=testbkg, sigma=4, shape=1) # in case fit_bkg = False this is not fitted
 
                 ctot = pm.math.concatenate((coefs, bkgd), axis=0)
 
@@ -629,15 +764,17 @@ def Run_Mhyd_PyMC3(Mhyd, model,bkglim=None,nmcmc=1000,fit_bkg=False,back=None,
 
                 count_obs = pm.Poisson('counts', mu=pred, observed=counts) #counts likelihood
 
-                sbmod = pred * elongation
+                sbmod = pred * elongation / Mhyd.sbprof.area / Mhyd.sbprof.effexp
 
-                sb_obs = pm.Deterministic('sb', sbmod[valid])  # Sx: only saved here
+                sb_obs = pm.Deterministic('sb', sbmod)  # Sx: only saved here
 
             else:
 
                 sbmod = pred * elongation
 
-                sb_obs = pm.Normal('sb', mu=sbmod[valid], observed=sb[valid], sigma=esb[valid]) #Sx likelihood
+                sbmod = pm.Deterministic('sb', sbmod)  # Sx: only saved here
+
+                sb_obs = pm.Normal('sb_obs', mu=sbmod[valid], observed=sb[valid], sigma=esb[valid]) #Sx likelihood
 
             # Temperature model and likelihood
             if Mhyd.spec_data is not None:
@@ -671,7 +808,9 @@ def Run_Mhyd_PyMC3(Mhyd, model,bkglim=None,nmcmc=1000,fit_bkg=False,back=None,
             # SZ pressure model and likelihood
             if Mhyd.sz_data is not None:
 
-                if Mhyd.sz_data.pres_sz is not None: # Fitting the pressure
+                if Mhyd.sz_data.sz_fit in ['P', 'logP']: # Fitting the pressure
+
+                    print(f'Pressure fit {Mhyd.sz_data.sz_fit}')
 
                     pfit = pth[index_sz]
 
@@ -681,9 +820,16 @@ def Run_Mhyd_PyMC3(Mhyd, model,bkglim=None,nmcmc=1000,fit_bkg=False,back=None,
                     if fit_eta:
                         pfit = pfit * eta # P_SZ = P_X * eta
 
-                    P_obs = pm.MvNormal('P', mu=pfit, observed=Mhyd.sz_data.pres_sz, cov=Mhyd.sz_data.covmat_sz)  # SZ pressure likelihood
+                    pm.Deterministic('pfit', pfit)
 
-                elif Mhyd.sz_data.y_sz is not None: # Fitting the Compton y parameter
+                    if Mhyd.sz_data.sz_fit == 'P':
+                        P_obs = pm.MvNormal('P', mu=pfit, observed=Mhyd.sz_data.pres_sz, cov=Mhyd.sz_data.covmat_sz)  # SZ pressure likelihood
+                    else:
+                        P_obs = pm.MvNormal('P', mu=pm.math.log(pfit), observed=Mhyd.sz_data.logp_sz, cov=Mhyd.sz_data.covmat_sz)  # SZ pressure likelihood
+
+                if Mhyd.sz_data.sz_fit in ['Y', 'logY']:
+
+                    print(f'Compton y fit {Mhyd.sz_data.sz_fit}')
 
                     nout = 2 * nmore
 
@@ -713,7 +859,7 @@ def Run_Mhyd_PyMC3(Mhyd, model,bkglim=None,nmcmc=1000,fit_bkg=False,back=None,
                         yfit = elongation_correction(y_num, (rin_m_p + rout_m_p)/2*cgskpc, index_sz, elongation).flatten()
 
                     elif fit_eta:
-                        yfit = y_num[index_sz] / eta
+                        yfit = y_num[index_sz] * eta
 
                     else:
                         yfit = y_num[index_sz]
@@ -722,7 +868,14 @@ def Run_Mhyd_PyMC3(Mhyd, model,bkglim=None,nmcmc=1000,fit_bkg=False,back=None,
 
                         yfit = pm.math.dot(Mhyd.sz_data.psfmat, yfit)
 
-                    Y_obs = pm.MvNormal('Y', mu=yfit, observed=Mhyd.sz_data.y_sz, cov=Mhyd.sz_data.covmat_sz)
+                    pm.Deterministic('yfit', yfit)
+
+                    print(y_num.shape.eval(), yfit.shape.eval(), index_sz, Mhyd.sz_data.logy_sz.shape, Mhyd.sz_data.covmat_sz.shape)
+
+                    if Mhyd.sz_data.sz_fit == 'Y':
+                        Y_obs = pm.MvNormal('Y', mu=yfit, observed=Mhyd.sz_data.y_sz, cov=Mhyd.sz_data.covmat_sz)
+                    else:
+                        Y_obs = pm.MvNormal('Y', mu=pm.math.log(yfit), observed=Mhyd.sz_data.logy_sz, cov=Mhyd.sz_data.covmat_sz)
 
         if Mhyd.wl_data is not None:
 
@@ -857,7 +1010,7 @@ def Run_Mhyd_PyMC3(Mhyd, model,bkglim=None,nmcmc=1000,fit_bkg=False,back=None,
 
             Mhyd.bkg = bfit
 
-            allsb_conv = np.dot(Mhyd.sbprof.psfmat, allsb[:, :npt])
+            allsb_conv = np.dot(Mhyd.sbprof.psfmat, allsb[:npt, :] + np.exp(samples[:, npt])[np.newaxis, :])
 
         else:
             # Ksb = calc_sb_operator(rad, Mhyd.sourcereg, Mhyd.pars, withbkg=False)
@@ -885,6 +1038,11 @@ def Run_Mhyd_PyMC3(Mhyd, model,bkglim=None,nmcmc=1000,fit_bkg=False,back=None,
         pmc = np.median(allsb_conv, axis=1)
         pmcl = np.percentile(allsb_conv, 50. - 68.3 / 2., axis=1)
         pmch = np.percentile(allsb_conv, 50. + 68.3 / 2., axis=1)
+
+        pmc = np.median(trace.posterior.sb, axis = (0, 1))
+        pmcl = np.percentile(trace.posterior.sb, 50. - 68.3 / 2., axis = (0, 1))
+        pmch = np.percentile(trace.posterior.sb, 50. + 68.3 / 2., axis = (0, 1))
+
         Mhyd.sb = pmc
         Mhyd.sb_lo = pmcl
         Mhyd.sb_hi = pmch
@@ -1047,8 +1205,13 @@ class Mhyd:
     :type max_rad: float
     """
 
-    def __init__(self, sbprofile=None, spec_data=None, sz_data=None, wl_data=None, vel_data=None, directory=None, redshift=None, cosmo=None,
-                 abund = 'aspl', Zs=0.3, max_rad=0):
+    def __init__(self,
+                 abund = 'aspl', Zs = 0.3,
+                 galaxy_object = None, directory = None,
+                 sb_data = None, spec_data = None, sz_data = None, wl_data = None, vel_data = None,
+                 cosmo = None,
+                 max_rad = 0.
+                 ):
 
         logger = logging.getLogger('hydromass')
         if not logger.hasHandlers():
@@ -1058,200 +1221,320 @@ class Mhyd:
             sh.setFormatter(logging.Formatter('%(asctime)s @%(name)-25s "%(message)s"', datefmt = '%d-%m-%y %H:%M'))
             logger.addHandler(sh)
 
-        self.logger = logger
+        self.logger = create_logger()
 
-        file_abund = get_data_file_path('abundances.dat')
-
-        self.mup, self.nhc, self.mu_e = mean_molecular_weights(file_abund, abund=abund, Zs=Zs)
+        self.abund, self.mup, self.nhc, self.mu_e = mean_molecular_weights(abund = abund, Zs = Zs)
 
         if directory is None:
-
-            self.logger.info('No output directory name provided, will output to subdirectory "mhyd" ')
-
-            directory = 'mhyd'
-
-        if not os.path.exists(directory):
-
+            directory = f'mhyd_tmp{random.randint(0, 1000)}'  # random number
+            self.logger.info(f'No output directory provided, will output to subdirectory "{directory}" ')
+        if not os.path.isdir(directory):
             os.makedirs(directory)
-
+        self.logger.info(f'Output folder is {directory}')
         self.dir = directory
 
-        if sbprofile is None:
+        if galaxy_object is None:
+            raise ValueError('No galaxy_object (type hydromass.GalaxyObject provided, please provide one with the "galaxy_object=" option')
+        self.redshift = galaxy_object.redshift
+        self.nh = galaxy_object.nh
 
-            self.logger.info('Error: no surface brightness profile provided, please provide one with the "sbprofile=" option')
+        if sb_data is None:
+            raise ValueError('no surface brightness profile provided, please provide one with the "sb_data=" option')
+        if type(sb_data) is not list:
+            logger.info('sb_data is not a list. Converting it... For future version sb_data will always be treated as a list')
+            sb_data = [sb_data]
+        self.sb_data = sb_data
 
-            return
 
-        self.sbprof = sbprofile
 
-        if redshift is None:
-
-            self.logger.info('Error: no redshift provided, please provide one with the "redshift=" option')
-            return
-
-        self.redshift = redshift
 
         if cosmo is None:
-
             self.logger.info('No cosmology provided, will default to Planck15')
-
             from astropy.cosmology import Planck15 as cosmo
-
         self.cosmo = cosmo
 
-        self.dlum = float(cosmo.luminosity_distance(redshift).value)
+        self.dlum = float(cosmo.luminosity_distance(self.redshift).value)
+        self.logger.info(f'Luminosity distance to the source: {self.dlum:.4g} Mpc')
 
-        self.logger.info(f'Luminosity distance to the source: {self.dlum:g} Mpc')
+        self.amin2kpc = float(cosmo.kpc_proper_per_arcmin(self.redshift).value)
+        self.logger.info(f'At the redshift of the source 1 arcmin is {self.amin2kpc:.4g} kpc')
 
-        amin2kpc = cosmo.kpc_proper_per_arcmin(redshift).value
-
-        self.amin2kpc = amin2kpc
-
-        self.logger.info(f'At the redshift of the source 1 arcmin is {self.amin2kpc:g} kpc')
+        self.rho_cz = (cosmo.critical_density(self.redshift).to('Msun/Mpc**3')).value # * cgsMpc ** 3 / Msun # critical density in Msun per Mpc^3
+        self.logger.info(f'At the redshift of the source critical density is {self.rho_cz:.4g} Msun/Mpc^3')
 
         if spec_data is None and sz_data is None:
-
-            self.logger.info('Error: no spectral data file or SZ data file provided, please provide at least one with the "spec_data=" or "sz_data=" '
-                          'options')
-
-            return
-
+            raise ValueError('Error: no spectral data file or SZ data file provided, please provide at least one with the "spec_data=" or "sz_data=" options')
+        if type(spec_data) is not list:
+            logger.info('spec_data is not a list. Converting it... For future version spec_data will always be treated as a list')
+            spec_data = [spec_data]
+        if type(sz_data) is not list:
+            logger.info('sz_data is not a list. Converting it... For future version sz_data will always be treated as a list')
+            sz_data = [sz_data]
         self.spec_data = spec_data
-
         self.sz_data = sz_data
 
-        self.wl_data = wl_data
+        # Make sure the conversion from arcmin to kpc is done in the correct cosmology, i.e. use amin2kpc just calculated
+        for sb in self.sb_data:
+            sb.kpc_data(self.amin2kpc)
+        for sp in self.spec_data:
+            if sp is not None:
+                sp.kpc_data(self.amin2kpc)
+        for sz in self.sz_data:
+            if sz is not None:
+                sz.kpc_data(self.amin2kpc)
 
+        # TODO: Do the same for WL and sigma_V
+        self.wl_data = wl_data
         self.veldata = vel_data
 
-        rho_cz = cosmo.critical_density(redshift).value * cgsMpc ** 3 / Msun # critical density in Msun per Mpc^3
-
-        self.mfact = 4. * np.pi * rho_cz * 1e-22
-
+        self.mfact = 4. * np.pi * self.rho_cz * 1e-22
         self.mfact0 = kev2erg * cgskpc / (cgsG * cgsamu * self.mup) / Msun / 1e13
-
         self.mgas_fact = cgsamu * self.mu_e / Msun
+        self.transf = 4. * (1. + self.redshift) ** 2 * (180. * 60.) ** 2 / np.pi / 1e-14 * self.nhc / cgsMpc * 1e3
 
-        self.transf = 4. * (1. + redshift) ** 2 * (180. * 60.) ** 2 / np.pi / 1e-14 * self.nhc / cgsMpc * 1e3
-
-        self.abund = abund
 
         rmax_sb, rmax_kt, rmax_sz = 0, 0, 0
-
-        if self.sbprof is not None:
-
-            rmax_sb = np.max((self.sbprof.bins+self.sbprof.ebins) * self.amin2kpc)
-
+        if self.sb_data is not None:
+            for this_sb_data in self.sb_data:
+                this_rmax_sb = np.max(this_sb_data.rout_x_kpc)
+                if this_rmax_sb > rmax_sb:
+                    rmax_sb = this_rmax_sb
         if self.spec_data is not None:
-
-            rmax_kt = np.max(self.spec_data.rout_x)
-
+            for this_spec_data in self.spec_data:
+                this_rmax_kt = np.max(this_spec_data.rout_x_kpc)
+                if this_rmax_kt > rmax_kt:
+                    rmax_kt = this_rmax_kt
         if self.sz_data is not None:
-
-            rmax_sz = np.max(self.sz_data.rout_sz)
+            for this_sz_data in self.sz_data:
+                this_rmax_sz = np.max(this_sz_data.rout_sz_kpc)
+                if this_rmax_sz > rmax_sz:
+                    rmax_sz = this_rmax_sz
 
         if max_rad < max(rmax_sb, rmax_kt, rmax_sz):
-            max_rad = max(max_rad, rmax_sb, rmax_kt, rmax_sz)
+            max_rad = max(rmax_sb, rmax_kt, rmax_sz)
             self.logger.info(f'WARNING: changing maximum radius of integration to {max_rad}')
 
-        self.max_rad = max_rad
+        self.max_rad_kpc = max_rad
+        self.max_rad_am = max_rad / self.amin2kpc
 
-    def emissivity(self, nh, rmf, type='single', kt=None, Z=0.3, elow=0.5, ehigh=2.0,
-                   arf=None, unit='cr', lum_elow=0.5, lum_ehigh=2.0, outz=None, method='interp',
-                   outkt=None, tmpdir='.', out_cfact_file=None, quiet=False):
+    def emissivity(self, absorption_model='phabs', conversion_factor_type='table', quiet=True, lum_elow=0.5, lum_ehigh=2.0):
         '''
-        Compute the conversion between count rate and emissivity using XSPEC by run the :func:`hydromass.emissivity.calc_emissivity` function. Requires XSPEC to be available in PATH.
+        In the updated version of hydromass, [rmf, arf, elow, ehigh, unit] are properties of the sb_data, while [redshift, nh] are properties of Mhyd from GalaxyObject
 
-        :param nh: Source NH in units of 1e22 cm**(-2)
-        :type nh: float
-        :param kt: Source temperature in keV. If None, the code will search for a loaded spectroscopic temperature profile and use the weighted mean temperature. Defaults to None
-        :type kt: float
-        :param rmf: Path to response file (RMF/RSP)
-        :type rmf: str
-        :param type: Set whether we will assume a constant conversion factor across the range (type="single") or if we will attempt to model the radial variations of the emissivity conversion factor (type="variable). Defaults to "single".
-        :type type: str
-        :param Z: Metallicity with respect to solar. If type='variable' and an abundance profile is loaded, this parameter is ignored. Defaults to 0.3
-        :type Z: float
-        :param elow: Low-energy bound of the input image in keV. Defaults to 0.5
-        :type elow: float
-        :param ehigh: High-energy bound of the input image in keV. Defaults to 2.0
-        :type ehigh: float
-        :param arf: Path to on-axis ARF (optional, in case response file is RMF)
-        :type arf: str
-        :param unit: Specify whether the exposure map is in units of sec (unit='cr') or photon flux (unit='photon'). By default unit='cr'.
-        :type unit: str
-        :param lum_elow: Low energy bound (rest frame) for luminosity calculation. Defaults to 0.5
-        :type lum_elow: float
-        :param lum_ehigh: High energy bound (rest frame) for luminosity calculation. Defaults to 2.0
-        :type lum_ehigh: float
-        :param outz: If type='variable', name of output file including the fit to the metal abundance profile. If None, it is ignored. Defaults to None.
-        :type outz: str
-        :param method: If type='variable', choose whether the temperature profile will be interpolated (method='interp') or fitted with a parametric function (method='fit'). Defaults to 'interp'.
-        :type method: str
-        :param outkt: If type='variable', name of output file including the fit to the temperature profile. If None, it is ignored. Defaults to None.
-        :type outkt: str
-        :param quiet: Do not print all xspec output
-        :type quiet: bool
-        :param out_cfact_file: Output conversion factor file for variable_ccf
-        :type out_cfact_file: str
-        :param tmpdir: Temporary directory to store XSPEC files. Defaults to '.'
-        :type tmpdir: str
+        :param absorption_model:
+            e.g. phabs, tbabs, etc. used to absorbed photons from the source to the observer
+        :param conversion_factor_type:
+            If type='variable', the temperature and metallicity profile will be fitted. If type='single', average temperature and metallicity are used. If type='table' a table in a grid of temperature
+            and metallicity is computed; then luminosity and count rate conversion factor are fitted using a polynomial ratio
+        :param quiet:
+            Controls the verbosity of Xspec
+        :param lum_elow:
+            Low energy bound (rest frame) for luminosity calculation.
+        :param lum_ehigh:
+            High energy bound (rest frame) for luminosity calculation.
+        '''
+        ConversionFactor.from_mhyd(
+            self, absorption_model, quiet, conversion_factor_type, lum_elow=lum_elow, lum_ehigh=lum_ehigh
+        )
+        self.conversion_factor_type = conversion_factor_type
+
+        if conversion_factor_type == 'table':
+            import jax.numpy as jnp
+
+            # for each sb_data fit table and return a class
+            for i_sb, this_sb_data in enumerate(self.sb_data):
+                fit = FitCCFTable(cf_mat=this_sb_data.cf_mat,
+                                  lf_mat=this_sb_data.lf_mat,
+                                  log_kt_array=jnp.log(this_sb_data.kt_array),
+                                  Z_ab_array=this_sb_data.Z_ab_array
+                    )
+                fit.fit_cf(self.dir, i_sb)
+                this_sb_data.cf_fit = fit
+
+                kt = float(np.mean([np.average(this_spec_data.temp_x, weights=1. / this_spec_data.errt_x ** 2) for this_spec_data in self.spec_data]))
+                Z_ab = float(np.mean([np.average(this_spec_data.zfe, weights=1. / this_spec_data.errt_zfe ** 2) for this_spec_data in self.spec_data]))
+                this_sb_data.mean_cf = fit.predict_cf(np.log(kt), Z_ab)
+                this_sb_data.mean_lf = fit.predict_lf(np.log(kt), Z_ab)
+
+                # If variable_ccf was calculated, compare the resulting ccf
+                variable_ccf = f'{self.dir}/emissivity_{i_sb}.dat'
+                if os.path.isfile(variable_ccf):
+                    rref_am, kt_prof, Z_prof, cf_prof, lf_prof = np.genfromtxt(variable_ccf, unpack=True, usecols=(0, 2, 3, 4, 5))
+
+                    cf_predict = fit.predict_cf(np.log(kt_prof), Z_prof)
+                    lf_predict = fit.predict_lf(np.log(kt_prof), Z_prof)
+
+                    # print(cf_prof / cf_predict)
+
+                    import matplotlib.pyplot as pl
+                    fig, ax1 = pl.subplots(figsize=(8, 5))
+
+                    ax1.plot(rref_am, cf_prof, label='Variable ccf', color='b')
+                    ax1.plot(rref_am, cf_predict, label='Table ccf', color='b', ls='--')
+                    ax1.tick_params(axis='y', labelcolor='b')
+
+                    ax2 = ax1.twinx()
+                    ax2.plot(rref_am, lf_prof, label='Variable llf', color='r')
+                    ax2.plot(rref_am, lf_predict, label='Table llf', color='r', ls='--')
+                    ax2.tick_params(axis='y', labelcolor='r')
+
+                    ax1.set_xscale('log')
+                    ax1.legend()
+                    ax2.legend()
+                    pl.savefig(f'{self.dir}/cf_table_variable_comparison.pdf')
+                    pl.close()
+
+
+    def fit(self,
+            method,
+            fit_SB=False, fit_bkg=False, bkglim_amin=None, backval=None,
+            fit_Z_Ab=False, model_Z_Ab=None,
+            fit_kT=False,
+            fit_SZ=False,
+            fit_WL=False,
+            fit_eta=False,
+            fit_elong=False,
+            cM_relation=False,
+            models_mass=None,
+            model_mstar=None, mstar=None,
+            model_missing_mass=None,
+            sb_setup=None,
+            rmin_amin=None, rmax_amin=None,
+            p0_prior=None, p0_type='sb',
+            num_warmup=1000, num_samples=2000, target_accept=0.95, num_chains=4, nuts_sampler="numpyro",
+            ):
         '''
 
-        if kt is None:
+        :param method:
+            Method used to get the 3-dimensional temperature. One of \' MASSMOD\', \' FORW\', \' GP\'.
+            Note: for MASSMOD the total mass is assumed to be: Mtot = Mgas + Mstar + Mother, with Mgas given by the gas mass from the integral of the gas density,
+            Mstar given by star mass component, and Mother given by the sum of models_mass
+        :param fit_SB:
+            Whether to fit the surface brightness profile or not. Default False.
+        :param fit_bkg:
+            Whether BKG is to be fitted or not. Default False: BKG subtracted and error added in quadrature to SB points.
+        :param bkglim_amin:
+            Region beyond which estimate the background value. Default last data point.
+        :param backval:
+            Estimated background value. Default None: compute from bkglim_amin parameter.
+        :param fit_Z_Ab:
+            Whether to fit the metallicity profile. Default False.
+        :param model_Z_Ab:
+            Model used to fit the metallicity profile. Default None.
+        :param fit_kT:
+            Whether to fit the temperature profile. Default False.
+        :param fit_SZ:
+            Whether to fit the SZ profile. Default False.
+        :param fit_WL:
+            Whether to fit the WL profile. Default False.
+        :param fit_eta:
+            Whether to allow the ratio between X-ray and SZ pressure to be a free parameter. Default False.
+        :param fit_elong:
+        :param cM_relation:
+        :param models_mass:
+            List of models to fit the non baryonic mass component.
+        :param mstar:
+            Array containing the cumulative stellar mass profile.
+        :param model_mstar:
+            Model used to fit the stellar mass component.
+                if mstar=None and model_mstar=None: mass_star=0
+                if mstar=something and model_mstar=None: mass_star=mstar
+                if mstar=None and model_mstar=something: mass_star=model_mstar
+                if mstar=something and model_mstar=something: mass_star=model_mstar ; model_mstar fitted to mstar
+        :param model_missing_mass:
+            Missing baryonic mass model: mbar = mgas + mstar + m_missing_mass_model. Default=None
+        :param sb_setup:
+        :param rmin_amin:
+            Minimun radius to consider the profiles for the fitting. Default 0.
+        :param rmax_amin:
+            Maximum radius to consider the profiles for the fitting. Default max_rad_am
+        :param p0_prior:
+        :param p0_type:
+        :param num_warmup:
+            Number of steps to do in warmup (discarded for posterior evaluation). Default 1000
+        :param num_samples:
+            Number of steps to sample the posterior. Default 2000
+        :param target_accept:
+            Target acceptance probability to tune the step size. We want step size to be accepted with this probability. Default 0.95
+        :param num_chains:
+            Number of chains to run in parallel. Default 4.
+        :param nuts_sampler:
+            Sampler used for the fitting. Default numpyro
+        '''
+        if (fit_SB is False) and (fit_kT is False) and (fit_Z_Ab is False) and (fit_SZ is False) and (fit_WL is False):
+            raise ValueError('Nothing to do. At least one of [fit_SB, fit_kT, fit_Z_Ab, fit_SZ, fit_WL] must be set to True')
 
-            if self.spec_data.temp_x is not None:
+        if fit_Z_Ab and model_Z_Ab is None:
+            raise ValueError('fit_Z_Ab is True but model_Z_Ab is not set')
 
-                kt = np.average(self.spec_data.temp_x, weights=1. / self.spec_data.errt_x ** 2)
+        dict_utils = common_utils(self, rmin_amin=rmin_amin, rmax_amin=rmax_amin)
 
+        sb_utils(self, dict_utils, sb_setup=sb_setup, fit_bkg=fit_bkg, bkglim_amin=bkglim_amin, backval=backval)
+
+        if fit_kT:
+            spec_utils(self, dict_utils)
+
+        # ccf_utils(self, dict_utils)
+
+        if method == 'MASSMOD':
+            mass_utils(self, dict_utils, mstar=mstar, p0_prior=p0_prior, p0_type=p0_type)
+        elif method == 'FORW':
+            forw_utils(self, dict_utils)
+        elif method == 'GP':
+            gp_utils(self, dict_utils)
+        else:
+            raise ValueError(f'{method = } not recognized. Use \'MASSMOD\', \'FORW\', or \'GP\'')
+
+        hydro_model = pm.Model()
+        with hydro_model:
+            params = dict()
+
+            get_density(params, dict_utils, self, fit_bkg=fit_bkg)
+
+            get_metal(params, model_Z_Ab, self, dict_utils)
+
+            if fit_Z_Ab:
+                likelihood_metal(params, model_Z_Ab, self, dict_utils)
+
+            if method == 'MASSMOD':
+                kt_from_mass(params, models_mass, self, dict_utils, mstar=mstar, model_mstar=model_mstar, model_missing_mass=model_missing_mass)
+            elif method == 'FORW':
+                kt_from_forw(params, model_P, self, dict_utils)
+            elif method == 'GP':
+                kt_from_gp(params, models, self, dict_utils)
             else:
+                raise ValueError(f'{method = } not recognized. Use \'MASSMOD\', \'FORW\', or \'GP\'')
 
-                Mhyd.logger.info('Error: no temperature provided, cannot proceed')
+            if fit_kT:
+                likelihood_kt(params, self, dict_utils)
 
-                return
+            get_ccf(params, self, dict_utils, self.conversion_factor_type)
 
-        if type == 'single':
 
-            Mhyd.logger.info(f'Mean cluster temperature: {kt} keV')
+            if fit_SB:
+                likelihood_sb(params, dict_utils, self, fit_bkg=fit_bkg)
 
-            self.ccf, self.lumfact, _, _, _ = calc_emissivity(cosmo=self.cosmo,
-                                            z=self.redshift,
-                                            nh=nh,
-                                            kt=kt,
-                                            rmf=rmf,
-                                            abund=self.abund,
-                                            Z=Z,
-                                            elow=elow,
-                                            ehigh=ehigh,
-                                            arf=arf,
-                                            unit=unit,
-                                            lum_elow=lum_elow,
-                                            lum_ehigh=lum_ehigh,
-                                            tmpdir=tmpdir,
-                                            quiet=quiet
-                                            )
+        with hydro_model:
+            # start = pm.find_MAP(start=initvals), initvals=start
 
-        elif type == 'variable':
+            trace = pmjax.sample_numpyro_nuts(num_samples, tune=num_warmup, target_accept=target_accept)
 
-            self.ccf, self.lumfact = variable_ccf(self,
-                                    cosmo=self.cosmo,
-                                    z=self.redshift,
-                                    nh=nh,
-                                    rmf=rmf,
-                                    method=method,
-                                    abund=self.abund,
-                                    elow=elow,
-                                    ehigh=ehigh,
-                                    arf=arf,
-                                    unit=unit,
-                                    lum_elow=lum_elow,
-                                    lum_ehigh=lum_ehigh,
-                                    outz=outz,
-                                    outkt=outkt,
-                                    tmpdir=tmpdir,
-                                    out_cfact_file=out_cfact_file,
-                                    quiet=quiet
-                                    )
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
     def run(self, model=None, bkglim=None, nmcmc=1000, fit_bkg=False, back=None,
             samplefile=None,
@@ -1261,7 +1544,7 @@ class Mhyd:
             p0_prior=None, tune=500, dmonly=False, mstar=None, find_map=True, pnt=False,
             rmin=None, rmax=None, p0_type='sb', init='ADVI', target_accept=0.9,
             pnt_model='Ettori', fit_elong=False, fit_eta=False, use_jax=True, wlonly=False, pnt_prior='sim',
-            fix_beta_pnt=False, do_ppc=True):
+            fix_beta_pnt=False, do_ppc=True, cM_relation=False):
         '''
         Optimize the mass model using the :func:`hydromass.mhyd.Run_Mhyd_PyMC3` function.
 
@@ -1358,7 +1641,8 @@ class Mhyd:
                        wlonly=wlonly,
                        pnt_prior=pnt_prior,
                        fix_beta_pnt=fix_beta_pnt,
-                       do_ppc=do_ppc)
+                       do_ppc=do_ppc,
+                       cM_relation=cM_relation)
 
 
     def run_forward(self, forward=None, bkglim=None, nmcmc=1000, fit_bkg=False, back=None,

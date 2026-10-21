@@ -6,7 +6,7 @@ import matplotlib.pyplot as plt
 from .deproject import MyDeprojVol, calc_density_operator, list_params, calc_linear_operator, calc_sb_operator, list_params_density
 from .plots import get_coolfunc
 from .constants import cgskpc, cgsMpc, cgsG, cgsamu, kev2erg, Msun, const_G_Msun_kpc, year, y_prefactor
-from .utility import sb_utils, dens_utils, rads_more
+from .utility_old import sb_utils, dens_utils, rads_more
 
 __all__ = ['gnfw_pm', 'gnfw_np', 'der_lnP_np', 'kt_forw_from_samples', 'P_forw_from_samples', 'mass_forw_from_samples', 'prof_forw_hires',
            'Forward', 'Run_Forward_PyMC3']
@@ -493,6 +493,10 @@ def prof_forw_hires(Mhyd, Forward, rin=None, npt=200, Z=0.3): #, extra=False, ma
 
     t3d = p3d / dens_m
 
+    dlog_dens_m_dlog_r = np.gradient(np.log(dens_m), axis = 0) / np.gradient(np.log(rref_m))[:, np.newaxis]
+
+    dlog_t3d_dlog_r = np.gradient(np.log(t3d), axis=0) / np.gradient(np.log(rref_m))[:, np.newaxis]
+
     # Mazzotta weights
     ei = dens_m ** 2 * t3d ** (-0.75)
 
@@ -510,6 +514,10 @@ def prof_forw_hires(Mhyd, Forward, rin=None, npt=200, Z=0.3): #, extra=False, ma
     mtp, mtpl, mtph = np.percentile(tproj, [50., 50. - 68.3 / 2., 50. + 68.3 / 2.], axis=1)
 
     mne, mnel, mneh = np.percentile(dens_m, [50., 50. - 68.3 / 2., 50. + 68.3 / 2.], axis=1)
+
+    mdlog_dens_m_dlog_r, mdlog_dens_m_dlog_rl, mdlog_dens_m_dlog_rh = np.percentile(dlog_dens_m_dlog_r, [50., 50. - 68.3 / 2., 50. + 68.3 / 2.], axis=1)
+
+    mdlog_t3d_dlog_r, mdlog_t3d_dlog_rl, mdlog_t3d_dlog_rh = np.percentile(dlog_t3d_dlog_r, [50., 50. - 68.3 / 2., 50. + 68.3 / 2.], axis=1)
 
     mK, mKl, mKh = np.percentile(K3d, [50., 50. - 68.3 / 2., 50. + 68.3 / 2.], axis=1)
 
@@ -547,7 +555,13 @@ def prof_forw_hires(Mhyd, Forward, rin=None, npt=200, Z=0.3): #, extra=False, ma
         "T_COOL_HI": mtch,
         "LAMBDA": mcf,
         "LAMBDA_LO": mcfl,
-        "LAMBDA_HI": mcfh
+        "LAMBDA_HI": mcfh,
+        "DLOG_NE_DLOG_R": mdlog_dens_m_dlog_r,
+        "DLOG_NE_DLOG_R_LO": mdlog_dens_m_dlog_rl,
+        "DLOG_NE_DLOG_R_HI": mdlog_dens_m_dlog_rh,
+        "DLOG_T_DLOG_R": mdlog_t3d_dlog_r,
+        "DLOG_T_DLOG_R_LO": mdlog_t3d_dlog_rl,
+        "DLOG_T_DLOG_R_HI": mdlog_t3d_dlog_rh,
     }
 
     return dict
@@ -647,7 +661,10 @@ class Forward:
 
 
 def Run_Forward_PyMC3(Mhyd,Forward, bkglim=None,nmcmc=1000,fit_bkg=False,back=None,
-                   samplefile=None,nrc=None,nbetas=6,min_beta=0.6, nmore=5,
+                   samplefile=None,
+                   nrc = None, min_rc = None, max_rc = None,
+                   nbetas = 6, min_beta = 0.6, max_beta = 3,
+                   nmore=5,
                    tune=500, find_map=True, rmin=0., rmax=None, fit_eta=False, do_ppc=True,
                    force_positive_mass = False, force_convective_stability = False, force_increasing_mass=False):
     """
@@ -837,8 +854,9 @@ def Run_Forward_PyMC3(Mhyd,Forward, bkglim=None,nmcmc=1000,fit_bkg=False,back=No
     #     Kdens_m = calc_density_operator(rout_m / Mhyd.amin2kpc, pardens, Mhyd.amin2kpc, withbkg=False)
 
     (testval, testbkg, npt, bkgcounts, counts, sb, esb, valid, cf, rin_m, rout_m, rref_m, proj_mat, volmat, index_sz, ntm, rad, rmin, rmax,
-     nbin) = sb_utils(Mhyd, fit_bkg = fit_bkg, rmin = rmin, rmax = rmax, bkglim = bkglim, back = back, nrc = nrc,
-                      nbetas = nbetas, min_beta = min_beta, nmore = nmore)
+     nbin) = sb_utils(Mhyd, fit_bkg = fit_bkg, rmin = rmin, rmax = rmax, bkglim = bkglim, back = back,
+                      nbetas = nbetas, min_beta = min_beta, max_beta = max_beta, nrc = nrc, min_rc = min_rc, max_rc = max_rc,
+                      nmore = nmore)
 
     rmin_kpc = rmin * Mhyd.amin2kpc
 
@@ -1014,15 +1032,25 @@ def Run_Forward_PyMC3(Mhyd,Forward, bkglim=None,nmcmc=1000,fit_bkg=False,back=No
         # SZ pressure model and likelihood
         if Mhyd.sz_data is not None:
 
-            if Mhyd.sz_data.pres_sz is not None:
+            if Mhyd.sz_data.sz_fit in ['P', 'logP']:  # Fitting the pressure
+
+                print(f'Pressure fit {Mhyd.sz_data.sz_fit}')
+
                 pfit = p3d[index_sz]
 
                 if fit_eta:
                     pfit = pfit * eta  # P_SZ = P_X * eta
 
-                P_obs = pm.MvNormal('P', mu=pfit, observed=Mhyd.sz_data.pres_sz, cov=Mhyd.sz_data.covmat_sz)  # SZ pressure likelihood
+                pm.Deterministic('pfit', pfit)
 
-            elif Mhyd.sz_data.y_sz is not None: # Fitting the Compton y parameter
+                if Mhyd.sz_data.sz_fit == 'P':
+                    P_obs = pm.MvNormal('P', mu=pfit, observed=Mhyd.sz_data.pres_sz, cov=Mhyd.sz_data.covmat_sz)  # SZ pressure likelihood
+                else:
+                    P_obs = pm.MvNormal('P', mu=pm.math.log(pfit), observed=Mhyd.sz_data.pres_sz_log, cov=Mhyd.sz_data.covmat_sz_log)  # SZ pressure likelihood
+
+            if Mhyd.sz_data.sz_fit in ['Y', 'logY']:
+
+                print(f'Compton y fit {Mhyd.sz_data.sz_fit}')
 
                 nout = 2 * nmore
 
@@ -1043,14 +1071,8 @@ def Run_Forward_PyMC3(Mhyd,Forward, bkglim=None,nmcmc=1000,fit_bkg=False,back=No
 
                 yfit = y_prefactor * integ  # prefactor in cm2/keV
 
-                # if fit_elong:
-                #     yfit = elongation_correction(y_num, (rin_m_p + rout_m_p)/2*cgskpc, index_sz, elongation).flatten()
-                #
-                # elif fit_eta:
-                #     yfit = y_num / eta
-                #
-                # else:
-                #     yfit = y_num
+                if fit_eta:
+                    yfit = yfit * eta
 
                 if Mhyd.sz_data.psfmat is not None:
 
@@ -1060,7 +1082,12 @@ def Run_Forward_PyMC3(Mhyd,Forward, bkglim=None,nmcmc=1000,fit_bkg=False,back=No
 
                     yfit = yfit[index_sz]
 
-                Y_obs = pm.MvNormal('Y', mu=yfit, observed=Mhyd.sz_data.y_sz, cov=Mhyd.sz_data.covmat_sz)
+                pm.Deterministic('yfit', yfit)
+
+                if Mhyd.sz_data.sz_fit == 'Y':
+                    Y_obs = pm.MvNormal('Y', mu=yfit, observed=Mhyd.sz_data.y_sz, cov=Mhyd.sz_data.covmat_sz)
+                else:
+                    Y_obs = pm.MvNormal('Y', mu=pm.math.log(yfit), observed=Mhyd.sz_data.logy_sz, cov=Mhyd.sz_data.covmat_sz)
 
     tinit = time.time()
 
@@ -1143,9 +1170,13 @@ def Run_Forward_PyMC3(Mhyd,Forward, bkglim=None,nmcmc=1000,fit_bkg=False,back=No
 
     if fit_bkg:
 
+        # sampb = np.array(trace.posterior['bkg']).flatten()
+        #
+        # samples = np.append(sampc, sampb, axis=1)
+
         sampb = np.array(trace.posterior['bkg']).flatten()
 
-        samples = np.append(sampc, sampb, axis=1)
+        samples = np.vstack((sampc.T, sampb)).T  # np.append(sampc, sampb, axis=1)
 
     else:
         samples = sampc

@@ -11,7 +11,7 @@ from .functions import Model
 from .nonparametric import calc_gp_operator_lognormal, calc_gp_grad_operator_lognormal, kt_GP_from_samples, P_GP_from_samples, mass_GP_from_samples, prof_GP_hires, Run_NonParametric_PyMC3
 from .forward import kt_forw_from_samples, P_forw_from_samples, Forward
 from .deproject import calc_density_operator, list_params, calc_linear_operator, calc_sb_operator, list_params_density, calc_grad_operator
-from .utility import rads_more
+from .utility_old import rads_more
 
 __all__ = ['SaveModel', 'ReloadModel', 'SaveGP', 'ReloadGP', 'SaveForward', 'ReloadForward', 'SaveProfiles', 'LoadProfiles']
 

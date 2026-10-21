@@ -4,10 +4,29 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="5521cb6d-2b2a-4738-9850-2cb9dfed795b" name="Changes" comment="Fixed bug in mass_GP_from_samples and created dens_utils function to compute density and mgas">
+    <list default="true" id="5521cb6d-2b2a-4738-9850-2cb9dfed795b" name="Changes" comment="somet">
+      <change afterPath="$PROJECT_DIR$/hydromass/conversion_factor_emissivity.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/hydromass/galaxy_object.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/hydromass/likelihoods.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/hydromass/model_abundance.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/hydromass/model_mass.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/hydromass/pyutils.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/hydromass/utility_old.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/inspectionProfiles/Project_Default.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/inspectionProfiles/Project_Default.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/hydromass/__init__.py" beforeDir="false" afterPath="$PROJECT_DIR$/hydromass/__init__.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/hydromass/delta.py" beforeDir="false" afterPath="$PROJECT_DIR$/hydromass/delta.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/hydromass/deproject.py" beforeDir="false" afterPath="$PROJECT_DIR$/hydromass/deproject.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/hydromass/emissivity.py" beforeDir="false" afterPath="$PROJECT_DIR$/hydromass/emissivity.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/hydromass/forward.py" beforeDir="false" afterPath="$PROJECT_DIR$/hydromass/forward.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/hydromass/functions.py" beforeDir="false" afterPath="$PROJECT_DIR$/hydromass/functions.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/hydromass/mhyd.py" beforeDir="false" afterPath="$PROJECT_DIR$/hydromass/mhyd.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/hydromass/mu.py" beforeDir="false" afterPath="$PROJECT_DIR$/hydromass/mean_molecular_weights.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/hydromass/nonparametric.py" beforeDir="false" afterPath="$PROJECT_DIR$/hydromass/nonparametric.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/hydromass/plots.py" beforeDir="false" afterPath="$PROJECT_DIR$/hydromass/plots.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/hydromass/polytropic.py" beforeDir="false" afterPath="$PROJECT_DIR$/hydromass/polytropic.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/hydromass/save.py" beforeDir="false" afterPath="$PROJECT_DIR$/hydromass/save.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/hydromass/tpdata.py" beforeDir="false" afterPath="$PROJECT_DIR$/hydromass/tpdata.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/hydromass/utility.py" beforeDir="false" afterPath="$PROJECT_DIR$/hydromass/utility.py" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
@@ -47,25 +66,36 @@
     <option name="showLibraryContents" value="true" />
     <option name="showMembers" value="true" />
   </component>
-  <component name="PropertiesComponent">{
-  &quot;keyToString&quot;: {
-    &quot;RunOnceActivity.ShowReadmeOnStart&quot;: &quot;true&quot;,
-    &quot;RunOnceActivity.TerminalTabsStorage.copyFrom.TerminalArrangementManager.252&quot;: &quot;true&quot;,
-    &quot;RunOnceActivity.git.unshallow&quot;: &quot;true&quot;,
-    &quot;git-widget-placeholder&quot;: &quot;master&quot;,
-    &quot;last_opened_file_path&quot;: &quot;/home/vittorio/PycharmProjects/hydromass&quot;,
-    &quot;settings.editor.selected.configurable&quot;: &quot;com.jetbrains.python.configuration.PyActiveSdkModuleConfigurable&quot;
+  <component name="PropertiesComponent"><![CDATA[{
+  "keyToString": {
+    "RunOnceActivity.ShowReadmeOnStart": "true",
+    "RunOnceActivity.TerminalTabsStorage.copyFrom.TerminalArrangementManager.252": "true",
+    "RunOnceActivity.git.unshallow": "true",
+    "RunOnceActivity.typescript.service.memoryLimit.init": "true",
+    "codeWithMe.voiceChat.enabledByDefault": "false",
+    "git-widget-placeholder": "master",
+    "last_opened_file_path": "/home/vittorio/Downloads/claude-code-jetbrains-plugin-0.1.14-beta.zip",
+    "node.js.detected.package.eslint": "true",
+    "node.js.detected.package.jshint": "true",
+    "node.js.detected.package.tslint": "true",
+    "node.js.selected.package.eslint": "(autodetect)",
+    "node.js.selected.package.jshint": "",
+    "node.js.selected.package.tslint": "(autodetect)",
+    "nodejs_package_manager_path": "npm",
+    "python.packages.toolwindow.project.migrated.to.right.top.v2": "true",
+    "settings.editor.selected.configurable": "preferences.pluginManager"
   }
-}</component>
+}]]></component>
   <component name="RecentsManager">
     <key name="CopyFile.RECENT_KEYS">
+      <recent name="$PROJECT_DIR$/hydromass" />
       <recent name="$PROJECT_DIR$" />
     </key>
   </component>
   <component name="SharedIndexes">
     <attachedChunks>
       <set>
-        <option value="bundled-python-sdk-2653e85de345-6d6dccd035ac-com.jetbrains.pycharm.pro.sharedIndexes.bundled-PY-253.31033.139" />
+        <option value="bundled-python-sdk-eff1e8def5f5-5bd6d13a2a75-com.jetbrains.pycharm.pro.sharedIndexes.bundled-PY-262.10315.174" />
       </set>
     </attachedChunks>
   </component>
@@ -76,46 +106,6 @@
       <option name="number" value="Default" />
       <option name="presentableId" value="Default" />
       <updated>1769759932248</updated>
-    </task>
-    <task id="LOCAL-00002" summary="Saving and loading the trace as well. Useful for model comparison when not run at the same time.">
-      <option name="closed" value="true" />
-      <created>1770029678257</created>
-      <option name="number" value="00002" />
-      <option name="presentableId" value="LOCAL-00002" />
-      <option name="project" value="LOCAL" />
-      <updated>1770029678257</updated>
-    </task>
-    <task id="LOCAL-00003" summary="Added __all__">
-      <option name="closed" value="true" />
-      <created>1770029866517</created>
-      <option name="number" value="00003" />
-      <option name="presentableId" value="LOCAL-00003" />
-      <option name="project" value="LOCAL" />
-      <updated>1770029866517</updated>
-    </task>
-    <task id="LOCAL-00004" summary="Added __all__">
-      <option name="closed" value="true" />
-      <created>1770030890785</created>
-      <option name="number" value="00004" />
-      <option name="presentableId" value="LOCAL-00004" />
-      <option name="project" value="LOCAL" />
-      <updated>1770030890785</updated>
-    </task>
-    <task id="LOCAL-00005" summary="Added rmax_sb of 4 Mpc">
-      <option name="closed" value="true" />
-      <created>1770117359063</created>
-      <option name="number" value="00005" />
-      <option name="presentableId" value="LOCAL-00005" />
-      <option name="project" value="LOCAL" />
-      <updated>1770117359064</updated>
-    </task>
-    <task id="LOCAL-00006" summary="Fixed imports">
-      <option name="closed" value="true" />
-      <created>1770118966523</created>
-      <option name="number" value="00006" />
-      <option name="presentableId" value="LOCAL-00006" />
-      <option name="project" value="LOCAL" />
-      <updated>1770118966523</updated>
     </task>
     <task id="LOCAL-00007" summary="Fixed imports">
       <option name="closed" value="true" />
@@ -469,8 +459,51 @@
       <option name="project" value="LOCAL" />
       <updated>1774514640329</updated>
     </task>
-    <option name="localTasksCounter" value="51" />
+    <task id="LOCAL-00051" summary="conversion factor omogenized to interpolate to rref. Before sometimes it was to rout">
+      <option name="closed" value="true" />
+      <created>1774515485948</created>
+      <option name="number" value="00051" />
+      <option name="presentableId" value="LOCAL-00051" />
+      <option name="project" value="LOCAL" />
+      <updated>1774515485948</updated>
+    </task>
+    <task id="LOCAL-00052" summary="Added computation of mgas_in as well as the mgas_out already present">
+      <option name="closed" value="true" />
+      <created>1774950720456</created>
+      <option name="number" value="00052" />
+      <option name="presentableId" value="LOCAL-00052" />
+      <option name="project" value="LOCAL" />
+      <updated>1774950720456</updated>
+    </task>
+    <task id="LOCAL-00053" summary="Added computation of mgas_in as well as the mgas_out already present">
+      <option name="closed" value="true" />
+      <created>1775228250924</created>
+      <option name="number" value="00053" />
+      <option name="presentableId" value="LOCAL-00053" />
+      <option name="project" value="LOCAL" />
+      <updated>1775228250925</updated>
+    </task>
+    <task id="LOCAL-00054" summary="Improved Vikhlinin fit for temperature in computation of conversion factor. Added option of skipping medsmooth that was doing a bad job. DOing Saclay clipping to the metallicity of fixing to  when error is large. Doing plot of the conversion factor">
+      <option name="closed" value="true" />
+      <created>1776064503370</created>
+      <option name="number" value="00054" />
+      <option name="presentableId" value="LOCAL-00054" />
+      <option name="project" value="LOCAL" />
+      <updated>1776064503371</updated>
+    </task>
+    <task id="LOCAL-00055" summary="somet">
+      <option name="closed" value="true" />
+      <created>1781855367386</created>
+      <option name="number" value="00055" />
+      <option name="presentableId" value="LOCAL-00055" />
+      <option name="project" value="LOCAL" />
+      <updated>1781855367387</updated>
+    </task>
+    <option name="localTasksCounter" value="56" />
     <servers />
+  </component>
+  <component name="TypeScriptGeneratedFilesManager">
+    <option name="version" value="3" />
   </component>
   <component name="Vcs.Log.Tabs.Properties">
     <option name="TAB_STATES">
@@ -484,10 +517,6 @@
     </option>
   </component>
   <component name="VcsManagerConfiguration">
-    <MESSAGE value="Fixed bug in forward.py" />
-    <MESSAGE value="Fixed bug in save.py" />
-    <MESSAGE value="Estimated P0 value can change by exactly one order of magnitude&#10;&#10;Added max_rad to Mhyd. It will be used in the construction of the physical cluster model, e.g. going to 4 Mpc" />
-    <MESSAGE value="proxies_forward to __all__" />
     <MESSAGE value="Determine max_rad including maximum of data" />
     <MESSAGE value="dlum should be a float" />
     <MESSAGE value="from .nonparametric import * was missing" />
@@ -509,6 +538,10 @@
     <MESSAGE value="Improved stability of convective stability, positive mass, increasing mass with &#10;def softplus(x):&#10;    return pm.math.log(1+pm.math.exp(x))" />
     <MESSAGE value="Fixed spectral projection" />
     <MESSAGE value="Fixed bug in mass_GP_from_samples and created dens_utils function to compute density and mgas" />
-    <option name="LAST_COMMIT_MESSAGE" value="Fixed bug in mass_GP_from_samples and created dens_utils function to compute density and mgas" />
+    <MESSAGE value="conversion factor omogenized to interpolate to rref. Before sometimes it was to rout" />
+    <MESSAGE value="Added computation of mgas_in as well as the mgas_out already present" />
+    <MESSAGE value="Improved Vikhlinin fit for temperature in computation of conversion factor. Added option of skipping medsmooth that was doing a bad job. DOing Saclay clipping to the metallicity of fixing to  when error is large. Doing plot of the conversion factor" />
+    <MESSAGE value="somet" />
+    <option name="LAST_COMMIT_MESSAGE" value="somet" />
   </component>
 </project>

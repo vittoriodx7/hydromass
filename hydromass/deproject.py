@@ -66,7 +66,7 @@ def calc_linear_operator(rad,sourcereg,pars,area,expo,psf):
 # Function to create the list of parameters for the basis functions
 nsh=4. # number of basis functions to set
 
-def list_params(rad,sourcereg,nrc=None,nbetas=6,min_beta=0.6):
+def list_params(rad,sourcereg,nbetas=6,min_beta=0.6, max_beta=3, nrc=None, min_rc=None, max_rc=None):
     """
     Define a list of parameters to define the dictionary of basis functions
 
@@ -87,9 +87,13 @@ def list_params(rad,sourcereg,nrc=None,nbetas=6,min_beta=0.6):
     npfit=len(rfit)
     if nrc is None:
         nrc = np.max([int(npfit/nsh),1])
-    allrc=np.logspace(np.log10(rfit[2]),np.log10(rfit[npfit-1]/2.),nrc)
+    if min_rc is None:
+        min_rc = rfit[2]
+    if max_rc is None:
+        max_rc = rfit[npfit-1]/2.
+    allrc=np.logspace(np.log10(min_rc),np.log10(max_rc),nrc)
     #allbetas=np.linspace(0.4,3.,6)
-    allbetas = np.linspace(min_beta, 3., nbetas)
+    allbetas = np.linspace(min_beta, max_beta, nbetas)
     nrc=len(allrc)
     nbetas=len(allbetas)
     rc=allrc.repeat(nbetas)
@@ -241,7 +245,7 @@ def calc_int_operator(a, b, pars):
     return Kint
 
 
-def list_params_density(rad, sourcereg, kpcp, nrc=None, nbetas=6, min_beta=0.6):
+def list_params_density(rad, sourcereg, kpcp, nbetas=6, min_beta=0.6, max_beta=3, nrc=None, min_rc=None, max_rc=None):
     """
     Define a list of parameters to transform the basis functions into gas density profiles
 
@@ -264,9 +268,13 @@ def list_params_density(rad, sourcereg, kpcp, nrc=None, nbetas=6, min_beta=0.6):
     npfit = len(rfit)
     if nrc is None:
         nrc = np.max([int(npfit / nsh), 1])
-    allrc = np.logspace(np.log10(rfit[2]), np.log10(rfit[npfit - 1] / 2.), nrc) * kpcp
+    if min_rc is None:
+        min_rc = rfit[2]
+    if max_rc is None:
+        max_rc = rfit[npfit - 1] / 2.
+    allrc = np.logspace(np.log10(min_rc), np.log10(max_rc), nrc) * kpcp
     # allbetas=np.linspace(0.5,3.,6)
-    allbetas = np.linspace(min_beta, 3., nbetas)
+    allbetas = np.linspace(min_beta, max_beta, nbetas)
     nrc = len(allrc)
     nbetas = len(allbetas)
     rc = allrc.repeat(nbetas)
@@ -279,7 +287,7 @@ def list_params_density(rad, sourcereg, kpcp, nrc=None, nbetas=6, min_beta=0.6):
 
 # Linear operator to transform parameters into density
 
-def calc_density_operator(rad, pars, kpcp, withbkg=True):
+def calc_density_operator(rfit, pars, withbkg = True):
     """
     Compute linear operator to transform a parameter vector into a gas density profile
 
@@ -300,29 +308,29 @@ def calc_density_operator(rad, pars, kpcp, withbkg=True):
     :return: Linear operator for gas density
     :rtype: numpy.ndarray
     """
-    # Select values in the source region
-    rfit = rad * kpcp
-    npt = len(rfit)
-    npars = len(pars[:, 0])
 
-    # Compute linear combination of basis functions in the source region
-    beta = np.repeat(pars[:, 0], npt).reshape(npars, npt)
-    rc = np.repeat(pars[:, 1], npt).reshape(npars, npt)
-    base = 1. + np.power(rfit / rc, 2)
-    expon = -3. * beta
+    rfit = np.asarray(rfit)
+    beta = pars[:, 0]
+    rc = pars[:, 1]
+
+    base = 1. + np.power(rfit[:, np.newaxis] / rc[np.newaxis, :], 2)
+    expon = -3. * beta[np.newaxis, :]
     func_base = np.power(base, expon)
+
     cfact = gamma(3 * beta) / gamma(3 * beta - 0.5) / np.sqrt(np.pi) / rc
     fng = func_base * cfact
 
     # Recast into full matrix and add column for background
     if withbkg:
-        nptot=len(rfit)
-        Ktot=np.zeros((nptot,npars+1))
-        Ktot[0:npt,0:npars]=fng.T
-        Ktot[:,npars]=0.0
+        nptot = len(rfit)
+        npt = len(rfit)
+        npars = len(pars[:, 0])
+        Ktot = np.zeros((nptot, npars + 1))
+        Ktot[0:npt, 0:npars] = fng
+        Ktot[:, npars] = 0.0
 
     else:
-        Ktot = fng.T
+        Ktot = fng
 
     return Ktot
 
@@ -366,7 +374,7 @@ def calc_density_operator_pm(rad, pars, elong, kpcp):
     return Ktot
 
 # Function to compute d(log n)/d(log r)
-def calc_grad_operator(rad, pars, kpcp, withbkg=True):
+def calc_grad_operator(rfit, pars, withbkg = True):
     '''
     Compute a linear operator transforming a parameter vector into a density gradient profile
 
@@ -388,32 +396,32 @@ def calc_grad_operator(rad, pars, kpcp, withbkg=True):
     :rtype: numpy.ndarray
     '''
     # Select values in the source region
-    rfit = rad * kpcp
     npt = len(rfit)
     npars = len(pars[:, 0])
 
     # Compute linear combination of basis functions in the source region
-    beta = np.repeat(pars[:, 0], npt).reshape(npars, npt)
-    rc = np.repeat(pars[:, 1], npt).reshape(npars, npt)
-    base = 1. + np.power(rfit / rc, 2)
-    expon = -3. * beta
+    beta = pars[:, 0]
+    rc = pars[:, 1]
+    base = 1. + np.power(rfit[:, np.newaxis] / rc[np.newaxis, :], 2)
+    expon = -3. * beta[np.newaxis, :]
     func_base = np.power(base, expon)
     cfact = gamma(3 * beta) / gamma(3 * beta - 0.5) / np.sqrt(np.pi) / rc
     n2 = func_base * cfact
-    dlogn2dlogr = - 6. * beta * (rfit / rc) ** 2 / base
+    dlogn2dlogr = - 6. * beta[np.newaxis, :] * (rfit[:, np.newaxis] / rc[np.newaxis, :]) ** 2 / base
     grad = n2 * dlogn2dlogr
 
     # Recast into full matrix and add column for background
     if withbkg:
-        nptot=len(rfit)
-        Ktot=np.zeros((nptot,npars+1))
-        Ktot[0:npt,0:npars]=grad.T
-        Ktot[:,npars]=0.0
+        nptot = len(rfit)
+        Ktot = np.zeros((nptot, npars + 1))
+        Ktot[0:npt, 0:npars] = grad.T
+        Ktot[:, npars] = 0.0
 
     else:
         Ktot = grad.T
 
     return Ktot
+
 
 
 def elongation_correction(profile_values, r_values, ev, elongation):
@@ -571,6 +579,7 @@ class MyDeprojVol:
                 volmat[ishell,iring]=volconst * (f1*ro[ishell]**3 - f2*ri[ishell]**3)
 
                 if volmat[ishell,iring] < 0.0:
+                    print('exit')
                     sys.exit()
 
         volume2=np.copy(volmat)

@@ -9,10 +9,10 @@ from scipy.special import gamma
 from tqdm import tqdm
 import pymc as pm
 from scipy.interpolate import interp1d
-
+import pytensor.tensor as tt
 from .deproject import calc_density_operator, calc_density_operator_pm, MyDeprojVol, elongation_correction_np
 from .constants import cgsamu, cgskpc, Msun, const_G_Msun_kpc, kev2erg, year, y_prefactor
-from .utility import dens_utils, rads_more
+from .utility_old import dens_utils, rads_more
 from .wl import get_radplus, rho_to_sigma_np, dsigma_trap_np, get_shear
 from .pnt import get_data_file_path, alpha_turb_np
 
@@ -102,7 +102,6 @@ def cumsum_mat(nval):
     totmat = np.flipud(zeromat)
 
     return  totmat
-
 
 
 
@@ -400,17 +399,26 @@ def densout_pout_from_samples(Mhyd, model, rin_m, rout_m):
 
         dens_m = np.empty((nsamp, nvalm))
 
+        dens_m_out = np.empty((nsamp, nvalm))
+
         for i in range(nsamp):
 
             Kdens_t = calc_density_operator_pm(rref_m / Mhyd.amin2kpc, Mhyd.pardens, Mhyd.elong[i], Mhyd.amin2kpc)
 
             dens_m[i] = np.sqrt(np.dot(Kdens_t, np.exp(samples[i])) / cf_prof * Mhyd.transf)  # electron density in cm-3
 
+            Kdens_t = calc_density_operator_pm(rout_m / Mhyd.amin2kpc, Mhyd.pardens, Mhyd.elong[i], Mhyd.amin2kpc)
+
+            dens_m_out[i] = np.sqrt(np.dot(Kdens_t, np.exp(samples[i])) / cf_prof * Mhyd.transf)  # electron density in cm-3
     else:
 
         Kdens_m = calc_density_operator(rref_m / Mhyd.amin2kpc, Mhyd.pardens, Mhyd.amin2kpc, withbkg=Mhyd.fit_bkg)
 
         dens_m = np.transpose(np.sqrt(np.dot(Kdens_m, np.exp(samples.T)) / cf_prof * Mhyd.transf))
+
+        Kdens_m = calc_density_operator(rout_m / Mhyd.amin2kpc, Mhyd.pardens, Mhyd.amin2kpc, withbkg=Mhyd.fit_bkg)
+
+        dens_m_out = np.transpose(np.sqrt(np.dot(Kdens_m, np.exp(samples.T)) / cf_prof * Mhyd.transf))
 
     rout_mul = np.tile(rout_m, nsamp).reshape(nsamp, nvalm)
 
@@ -433,7 +441,9 @@ def densout_pout_from_samples(Mhyd, model, rin_m, rout_m):
 
         cs_mat = np.tril(ones_mat)
 
-        mgas = np.dot(cs_mat, dens_m.T * nhconv * volmat) / 1e13 / Mhyd.mfact0
+        mgas_out = np.dot(cs_mat, dens_m.T * nhconv * volmat) / 1e13 / Mhyd.mfact0
+
+        mgas_rref = np.concatenate((mgas_out[0, :][np.newaxis, :], (mgas_out[1:,:] + mgas_out[:-1,:])), axis=0) / 2
 
         if Mhyd.mstar is not None:
 
@@ -441,15 +451,15 @@ def densout_pout_from_samples(Mhyd, model, rin_m, rout_m):
 
             cum_mstar = Mhyd.mstar[:, 1]
 
-            mstar_m = np.interp(rout_m, r_mstar, cum_mstar)
+            mstar_m = np.interp(rref_m, r_mstar, cum_mstar)
 
             mstar_mul = np.repeat(mstar_m, nsamp).reshape(nvalm, nsamp)
 
-            mbar = mgas + mstar_mul / Mhyd.mfact0 / 1e13
+            mbar = mgas_rref + mstar_mul / Mhyd.mfact0 / 1e13
 
         else:
 
-            mbar = mgas
+            mbar = mgas_rref
 
     if model.massmod in  ['MOND', 'GMOND', 'EMOND']:
 
@@ -488,7 +498,7 @@ def densout_pout_from_samples(Mhyd, model, rin_m, rout_m):
 
         pth = press_out
 
-    return dens_m.T, press_out, pth
+    return dens_m.T, press_out, pth, dens_m_out.T
 
 def kt_from_samples(Mhyd, model, nmore=5):
     """
@@ -528,12 +538,12 @@ def kt_from_samples(Mhyd, model, nmore=5):
 
     npx = len(Mhyd.spec_data.rref_x)
 
-    dens_m, press_out, pth = densout_pout_from_samples(Mhyd, model, rin_m, rout_m)
+    dens_m, press_out, pth, dens_m_out = densout_pout_from_samples(Mhyd, model, rin_m, rout_m)
 
-    t3d = pth / dens_m
+    t3d = pth / dens_m_out
 
     # Mazzotta weights
-    ei = dens_m ** 2 * t3d ** (-0.75)
+    ei = dens_m_out ** 2 * t3d ** (-0.75)
 
     # Temperature projection
     flux = np.dot(proj_mat, ei)
@@ -583,9 +593,7 @@ def P_from_samples(Mhyd, model, nmore=5, return_Y=False, nout=10):
 
     rin_m, rout_m, index_x, index_sz, sum_mat, ntm = rads_more(Mhyd, nmore=nmore)
 
-    dens_m, press_tot, pth = densout_pout_from_samples(Mhyd, model, rin_m, rout_m)
-
-    print(pth.shape)
+    dens_m, press_tot, pth, _ = densout_pout_from_samples(Mhyd, model, rin_m, rout_m)
 
     pmt, plot, phit = np.percentile(pth, [50., 50. - 68.3 / 2., 50. + 68.3 / 2.], axis=1)
 
@@ -993,9 +1001,13 @@ def prof_hires(Mhyd, model, rin=None, npt=200, Z=0.3):
 
     vol_x = vx.deproj_vol().T
 
-    dens_m, p3d, pth = densout_pout_from_samples(Mhyd, model, rin_m, rout_m)
+    dens_m, p3d, pth, _ = densout_pout_from_samples(Mhyd, model, rin_m, rout_m)
+
+    dlog_dens_m_dlog_r = np.gradient(np.log(dens_m), axis=0) / np.gradient(np.log(rref_m))[:, np.newaxis]
 
     t3d = pth / dens_m
+
+    dlog_t3d_dlog_r = np.gradient(np.log(t3d), axis=0) / np.gradient(np.log(rref_m))[:, np.newaxis]
 
     # Mazzotta weights
     ei = dens_m ** 2 * t3d ** (-0.75)
@@ -1016,6 +1028,10 @@ def prof_hires(Mhyd, model, rin=None, npt=200, Z=0.3):
     mtp, mtpl, mtph = np.nanpercentile(tproj, [50., 50. - 68.3 / 2., 50. + 68.3 / 2.], axis=1)
 
     mne, mnel, mneh = np.percentile(dens_m, [50., 50. - 68.3 / 2., 50. + 68.3 / 2.], axis=1)
+
+    mdlog_dens_m_dlog_r, mdlog_dens_m_dlog_rl, mdlog_dens_m_dlog_rh = np.percentile(dlog_dens_m_dlog_r, [50., 50. - 68.3 / 2., 50. + 68.3 / 2.], axis=1)
+
+    mdlog_t3d_dlog_r, mdlog_t3d_dlog_rl, mdlog_t3d_dlog_rh = np.percentile(dlog_t3d_dlog_r, [50., 50. - 68.3 / 2., 50. + 68.3 / 2.], axis=1)
 
     mK, mKl, mKh = np.percentile(K3d, [50., 50. - 68.3 / 2., 50. + 68.3 / 2.], axis=1)
 
@@ -1091,9 +1107,14 @@ def prof_hires(Mhyd, model, rin=None, npt=200, Z=0.3):
         "T_COOL_HI": mtch,
         "LAMBDA": mcf,
         "LAMBDA_LO": mcfl,
-        "LAMBDA_HI": mcfh
+        "LAMBDA_HI": mcfh,
+        "DLOG_NE_DLOG_R": mdlog_dens_m_dlog_r,
+        "DLOG_NE_DLOG_R_LO": mdlog_dens_m_dlog_rl,
+        "DLOG_NE_DLOG_R_HI": mdlog_dens_m_dlog_rh,
+        "DLOG_T_DLOG_R": mdlog_t3d_dlog_r,
+        "DLOG_T_DLOG_R_LO": mdlog_t3d_dlog_rl,
+        "DLOG_T_DLOG_R_HI": mdlog_t3d_dlog_rh,
     }
-
     return dict
 
 def mgas_pm(rin_m, rout_m, dens):
@@ -1121,15 +1142,7 @@ def mgas_pm(rin_m, rout_m, dens):
 
     mgas_out = pm.math.dot(cs_mat, dens * volint) / 1e13
 
-    rin_m_roll = np.roll(rin_m, 1)
-
-    rin_m_roll[0] = 0
-
-    volint = 4. / 3. * np.pi * (rin_m ** 3 - rin_m_roll ** 3)
-
-    mgas_in = pm.math.dot(cs_mat, dens * volint) / 1e13
-
-    return mgas_out, mgas_in
+    return mgas_out
 
 
 def PlotMgas(Mhyd, plot=False, outfile=None, nmore=5):

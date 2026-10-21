@@ -1,0 +1,1205 @@
+import numpy as np
+import scipy.special as special
+import pymc as pm
+import pytensor as theano
+import pytensor.tensor as tt
+
+from .constants import const_G_Msun_kpc
+
+
+class ArcTan(tt.Op):
+    '''
+    Theano arctan class
+    '''
+    itypes = [tt.dvector]
+    otypes = [tt.dvector]
+
+    def perform(self, node, inputs, outputs):
+        x, = inputs
+        y = np.arctan(x)
+        outputs[0][0] = np.array(y)
+
+    def grad(self, inputs, g):
+        x, = inputs
+        return [g[0] / (1 + x ** 2)]
+
+
+tt_arctan = ArcTan()
+
+
+def f_ein_mu(x, mu):
+    '''
+    Einasto mass model as a function of :math:`\\mu=1/\\alpha` (Mamon & Lokas 2005)
+
+    :param x: Scaled radius
+    :type x: float
+    :param mu: Einasto mu
+    :type mu: float
+    :return: Scaled mass profile
+    :rtype: float
+    '''
+    n0 = 2. * mu
+
+    n1 = 3. * mu
+
+    fx = mu ** (1. - n1) / 2. ** n1 * np.exp(n0) * special.gamma(n1) * special.gammainc(n1, n0 * x ** (1. / mu))
+
+    return fx
+
+
+def f_ein_mu_der(x, mu):
+    '''
+    Analytical derivative of the Einasto mass profile
+
+    :param x: Scaled radius
+    :type x: float
+    :param mu: Einasto mu
+    :type mu: float
+    :return: Derivative of the scaled mass profile
+    :rtype: float
+    '''
+    n0 = 2. * mu
+
+    fx = x ** 2 * np.exp(n0) * np.exp(- n0 * x ** (1. / mu))
+
+    return fx
+
+
+# Class to implement the 2-parameter Einasto mass profile and its derivative
+class EinastoFx(tt.Op):
+    '''
+    Theano class implementing the 2-parameter Einasto model with fixed mu=5.0
+
+    '''
+    itypes = [tt.dvector]
+    otypes = [tt.dvector]
+
+    def perform(self, node, inputs, outputs):
+        x, = inputs
+        y = f_ein_mu(x, 5.)
+        outputs[0][0] = np.array(y)
+
+    def grad(self, inputs, g):
+        x, = inputs
+        return [g[0] * f_ein_mu_der(x, 5.)]
+
+
+tt_einasto = EinastoFx()
+
+
+# 2-parameter Einasto function
+def f_ein2_pm(xout, c200, r200, delta=200.):
+    '''
+    Theano function returning the 2-parameter Einasto model for a given set of parameters.
+
+    .. math::
+
+        \\rho(r) = \\rho_s \\exp \\left[ -2\\mu \\left( \\left( \\frac{r}{r_s} \\right) ^ {1 /\\mu} - 1 \\right) \\right]
+
+    with :math:\\mu=5.0
+
+    :param xout: Radius
+    :param c200: concentration
+    :param r200: Scale radius
+    :param delta: Overdensity
+    :return: Enclosed mass
+    '''
+
+    fcc = delta / 3. * c200 ** 3 / (pm.math.log(1. + c200) - c200 / (1. + c200))
+
+    x = xout / r200
+
+    fx = tt_einasto(x)  # To be updated to free mu
+
+    return r200 ** 3 * fcc * fx
+
+
+# 3-parameter Einasto function, we need to integrate the density numerically since the gradient is not analytical
+def f_ein3_pm(xout, c200, r200, mu, delta=200.):
+    '''
+    Theano function for the 3-parameter Einasto mass model,
+
+    .. math::
+
+        M(r) = f_c R_{\\Delta}^3 \\int_{0}^{r} 4 \\pi r^2 \\rho(r) dr
+
+    with
+
+    .. math::
+
+        \\rho(x) = \\exp \\left[ -2\\mu \\left( \\left( \\frac{r}{R_{\\Delta}} \\right) ^ {1 /\\mu} - 1 \\right) \\right]
+
+    and
+
+    .. math::
+
+        f_c = \\frac{\\Delta}{3} \\frac{c^3}{\\ln(1+c)- c/(1+c)}
+
+    :param xout: Radius
+    :param c200: concentration
+    :param r200: Scale radius
+    :param mu: Einasto mu
+    :param delta: Overdensity
+    :return: Enclosed mass
+
+    '''
+    fcc = delta / 3. * c200 ** 3 / (pm.math.log(1. + c200) - c200 / (1. + c200))
+
+    npt = len(xout)
+
+    dr = (xout - np.roll(xout, 1))
+
+    dr[0] = xout[0]
+
+    x = (xout - dr / 2.) / r200
+
+    n0 = 2. * mu
+
+    integrand = x ** 2 * pm.math.exp(n0) * pm.math.exp(- n0 * x ** (1. / mu)) * dr / r200
+
+    matrad = np.ones((npt, npt))
+
+    matrad_tril = np.tril(matrad)
+
+    fx = pm.math.dot(matrad_tril, integrand)
+
+    return r200 ** 3 * fcc * fx
+
+def f_mond_pm(xout, g_cross, mbar = 0):
+    '''
+    MOND fitting to the mass profile. Since g_obs = F(g_bar), we can write HEE with equivalent MOND mass g_obs * r^2 / G
+
+    :param xout:
+    :param g_cross:
+    :return:
+    '''
+
+    g_bar = mbar * const_G_Msun_kpc / xout**2
+
+    g_obs = g_bar / (1 - pm.math.exp(-pm.math.sqrt(g_bar / pm.math.exp(g_cross))))
+
+    return (g_obs-g_bar) * xout**2 / const_G_Msun_kpc
+
+def f_mond_np(xout, pars, mbar = 0):
+    '''
+    MOND fitting to the mass profile. See (see :func:`hydromass.functions.f_mond_pm`)
+
+    :param xout:
+    :param g_cross:
+    :return:
+    '''
+
+    g_cross = pars[:, 0]
+
+    g_bar = mbar.T * const_G_Msun_kpc / xout[np.newaxis, :]**2
+
+    g_obs = g_bar / (1 - np.exp(-np.sqrt(g_bar / np.exp(g_cross[:, np.newaxis]))))
+
+    return (g_obs-g_bar) * xout[np.newaxis, :]**2 / const_G_Msun_kpc
+
+def f_gmond_pm(xout, log_C, log_g_0, sigma_g, mbar = 0):
+    '''
+    GMOND fitting to the mass profile. Since g_obs = F(g_bar), we can write HEE with equivalent MOND mass g_obs * r^2 / G
+
+    :param xout:
+    :param log_C:
+    :param log_g_0:
+    :param mbar:
+    :return:
+    '''
+
+    g_bar = mbar * const_G_Msun_kpc / xout**2
+
+    log_g_bar = pm.math.log(g_bar)
+
+    S = pm.math.exp(-0.5 * ((log_g_bar - log_g_0) / sigma_g) ** 2)
+
+    log_g_obs = log_g_bar * (1 - S / 2) + log_C * S
+
+    return pm.math.exp(log_g_obs) * xout**2 / const_G_Msun_kpc
+
+def f_gmond_np(xout, pars, mbar = 0):
+    '''
+    GMOND fitting to the mass profile. See (see :func:`hydromass.functions.f_gmond_pm`)
+    :param xout:
+    :param pars:
+    :param mbar:
+    :return:
+    '''
+
+    log_C = pars[:, 0]
+
+    log_g_0 = pars[:, 1]
+
+    sigma_g = pars[:, 2]
+
+    g_bar = mbar.T * const_G_Msun_kpc / xout[np.newaxis, :] ** 2
+
+    log_g_bar = np.log(g_bar)
+
+    S = np.exp(-0.5 * ((log_g_bar - log_g_0[:, np.newaxis]) / sigma_g[:, np.newaxis]) ** 2)
+
+    log_g_obs = log_g_bar * (1 - S / 2) + log_C[:, np.newaxis] * S
+
+    return np.exp(log_g_obs) * xout[np.newaxis, :] ** 2 / const_G_Msun_kpc
+
+def f_emond_pm(xout, alpha1, alpha2, log_g1, log_g2, mbar = 0):
+    '''
+    EckertMOND fitting to the mass profile. Since g_obs = F(g_bar), we can write HEE with equivalent MOND mass g_obs * r^2 / G
+
+    :param xout:
+    :param alpha1:
+    :param alpha2:
+    :param g1:
+    :param g2:
+    :param mbar:
+    :return:
+    '''
+
+    g1 = pm.math.exp(log_g1)
+
+    g2 = pm.math.exp(log_g2)
+
+    g_bar = mbar * const_G_Msun_kpc / xout**2
+
+    log_g_bar = pm.math.log(g_bar)
+
+    log_g_obs = log_g_bar + alpha1 * pm.math.log(1 + g1 / g_bar) + (alpha2 - alpha1) * pm.math.log(1 + g2 / g_bar)
+
+    return pm.math.exp(log_g_obs) * xout**2 / const_G_Msun_kpc
+
+def f_emond_np(xout, pars, mbar = 0):
+    '''
+    EckertMOND fitting to the mass profile. See (see :func:`hydromass.functions.f_gmond_pm`)
+    :param xout:
+    :param pars:
+    :param mbar:
+    :return:
+    '''
+
+    alpha1 = pars[:, 0]
+
+    alpha2 = pars[:, 1]
+
+    log_g1 = pars[:, 2]
+
+    log_g2 = pars[:, 3]
+
+    g1 = np.exp(log_g1)
+
+    g2 = np.exp(log_g2)
+
+    g_bar = mbar.T * const_G_Msun_kpc / xout[np.newaxis, :] ** 2
+
+    log_g_bar = np.log(g_bar)
+
+    log_g_obs = (log_g_bar +
+                 alpha1[:, np.newaxis] * np.log(1 + g1[:, np.newaxis] / g_bar) +
+                 (alpha2[:, np.newaxis] - alpha1[:, np.newaxis]) * np.log(1 + g2[:, np.newaxis] / g_bar))
+
+    return np.exp(log_g_obs) * xout[np.newaxis, :] ** 2 / const_G_Msun_kpc
+
+def f_sersic_pm(xout, c200_sersic, r200_sersic, b, n, alpha, delta=200.):
+    '''
+    Theano function for the NFW + Sersic mass model. Sersic model from Prugniel+1997 approximation.
+    Eq. B6 in https://articles.adsabs.harvard.edu/pdf/1997A%26A...321..111P
+
+    .. math::
+
+        M(r) = f_c R_{\\Delta}^3 \\int_{0}^{r} 4 \\pi r^2 \\rho(r) dr
+
+    with
+
+    .. math::
+        \\rho(r) = \\rho_\\mathrm{Sersic}(r) + \\rho_\\mathrm{NFW}(r)
+
+    with NFW density see :func:`hydromass.functions.f_nfw_pm`, and Sersic density:
+
+    .. math::
+
+        \\rho_\\mathrm{Sersic}(r) = \\left( \\frac{r}{R_{\\Delta}} \\right)^{-\\alpha}  \\exp \\left[ - b \\left( \\left( \\frac{r}{R_{\\Delta}}
+        \\right) ^ {1
+        /n}
+        \\right) \\right]
+
+    and
+
+    .. math::
+
+        f_c = \\frac{\\Delta}{3} \\frac{c^3}{\\ln(1+c)- c/(1+c)}
+
+    :param xout: Radius
+    :param c200_nfw: concentration
+    :param r200_nfw: Scale radius
+    :param c200_sersic: concentration
+    :param r200_sersic: Scale radius
+    :param b: Sersic b
+    :param n: Sersic n
+    :param delta: Overdensity
+    :return: Enclosed mass
+
+    '''
+
+    # Sersic first: note that it is just EIN3 but with extra renaming, e.g. 2/alpha=2*mu=bn, alpha=1/n
+    fcc = delta / 3. * c200_sersic ** 3 / (pm.math.log(1. + c200_sersic) - c200_sersic / (1. + c200_sersic))
+
+    npt = len(xout)
+
+    dr = (xout - np.roll(xout, 1))
+
+    dr[0] = xout[0]
+
+    x = (xout - dr / 2.) / r200_sersic
+
+    integrand = ( x ** (2-alpha) ) * pm.math.exp(- b * x ** (1. / n)) * dr / r200_sersic
+
+    matrad = np.ones((npt, npt))
+
+    matrad_tril = np.tril(matrad)
+
+    fx = pm.math.dot(matrad_tril, integrand)
+
+    massmod_sersic = r200_sersic ** 3 * fcc * fx
+
+    return  massmod_sersic
+
+
+
+def f_sersic_np(xout, pars, delta=200.):
+    '''
+    Numpy function for the NFW + Sersic mass model (see :func:`hydromass.functions.f_sersic_pm`)
+
+    :param xout: Radius
+    :type xout: numpy.ndarray
+    :param pars: 2D array with the chains of parameters of the mass model (cdelta, rs, and mu)
+    :type pars: numpy.ndarray
+    :param delta: Overdensity
+    :type delta: float
+    :return: Enclosed mass
+    :rtype: numpy.ndarray
+
+    '''
+
+    c200_sersic = pars[:, 0]
+
+    r200_sersic = pars[:, 0]
+
+    b = pars[:, 2]
+
+    n = pars[:, 3]
+
+    alpha = pars[:, 4]
+
+    # Sersic first: note that it is just EIN3 but with extra renaming, e.g. 2/alpha=2*mu=bn, alpha=1/n
+    fcc = delta / 3. * c200_sersic ** 3 / (np.log(1. + c200_sersic) - c200_sersic / (1. + c200_sersic))
+
+    npt = len(xout)
+
+    dr = (xout - np.roll(xout, 1))
+
+    dr[0] = xout[0]
+
+    x = (xout - dr / 2.)[np.newaxis, :] / r200_sersic[:, np.newaxis]
+
+    integrand = (x ** (2 - alpha[:, np.newaxis])) * np.exp(- b[:, np.newaxis] * x ** (1. / n[:, np.newaxis])) * dr[np.newaxis, :] / r200_sersic[:, np.newaxis]
+
+    matrad = np.ones((npt, npt))
+
+    matrad_tril = np.tril(matrad)
+
+    fx = np.dot(matrad_tril, integrand.T).T
+
+    massmod_sersic = r200_sersic[:, np.newaxis] ** 3 * fcc[:, np.newaxis] * fx
+
+    return  massmod_sersic
+
+def f_ein2_np(xout, pars, delta=200.):
+    '''
+    Numpy function for the Einasto 2-parameter model
+
+    .. math::
+
+        \\rho(r) = \\rho_s \\exp \\left[ -2\\mu \\left( \\left( \\frac{r}{r_s} \\right) ^ {1 /\\mu} - 1 \\right) \\right]
+
+    with :math:\\mu=5.0
+
+    :param xout: Radius
+    :type xout: numpy.ndarray
+    :param pars: Model parameters (cdelta and rs)
+    :type pars: numpy.ndarray
+    :param delta: Overdensity
+    :type delta: float
+    :return: Enclosed mass
+    :rtype: numpy.ndarray
+    '''
+    c200 = pars[:, 0]
+
+    r200 = pars[:, 1]
+
+    nn = 5
+
+    n0 = 2. * nn
+
+    n1 = 3. * nn
+
+    npt = len(xout)
+
+    npars = len(c200)
+
+    c200mul = np.repeat(c200, npt).reshape(npars, npt)
+
+    r200mul = np.repeat(r200, npt).reshape(npars, npt)
+
+    fcc = delta / 3. * c200mul ** 3 / (np.log(1. + c200mul) - c200mul / (1. + c200mul))
+
+    xoutmul = np.tile(xout, npars).reshape(npars, npt)
+
+    x = xoutmul / r200mul
+
+    fx = nn ** (1. - n1) / 2. ** n1 * np.exp(n0) * special.gamma(n1) * special.gammainc(n1, n0 * x ** (1. / nn))
+
+    return r200mul ** 3 * fcc * fx
+
+
+def f_ein3_np(xout, pars, delta=200.):
+    '''
+    Numpy function for the numerically integrated 3-parameter Einasto mass model (see :func:`hydromass.functions.f_ein3_pm`)
+
+    :param xout: Radius
+    :type xout: numpy.ndarray
+    :param pars: 2D array with the chains of parameters of the mass model (cdelta, rs, and mu)
+    :type pars: numpy.ndarray
+    :param delta: Overdensity
+    :type delta: float
+    :return: Enclosed mass
+    :rtype: numpy.ndarray
+    '''
+    c200 = pars[:, 0]
+
+    r200 = pars[:, 1]
+
+    mu = pars[:, 2]
+
+    npt = len(xout)
+
+    npars = len(c200)
+
+    c200mul = np.repeat(c200, npt).reshape(npars, npt)
+
+    r200mul = np.repeat(r200, npt).reshape(npars, npt)
+
+    mumul = np.repeat(mu, npt).reshape(npars, npt)
+
+    n0 = 2. * mumul
+
+    n1 = 3. * mumul
+
+    fcc = delta / 3. * c200mul ** 3 / (np.log(1. + c200mul) - c200mul / (1. + c200mul))
+
+    xoutmul = np.tile(xout, npars).reshape(npars, npt)
+
+    x = xoutmul / r200mul
+
+    fx = mumul ** (1. - n1) / 2. ** n1 * np.exp(n0) * special.gamma(n1) * special.gammainc(n1, n0 * x ** (1. / mumul))
+
+    return r200mul ** 3 * fcc * fx
+
+def rho_ein3_pm(xout, cnorm, rs, mu, delta=200.):
+
+    fcc = delta / 3. * cnorm ** 3 / (pm.math.log(1. + cnorm) - cnorm / (1. + cnorm))
+
+    npt = len(xout)
+
+    x = (xout[1:] + xout[:-1]) * 1000 / 2 / rs
+
+    n0 = 2. * mu
+
+    integrand = pm.math.exp(n0) * pm.math.exp(- n0 * x ** (1. / mu))
+
+    return integrand * fcc
+
+def rho_ein3_np(xout, cnorm, rs, mu, delta=200.):
+
+    fcc = delta / 3. * cnorm ** 3 / (np.log(1. + cnorm) - cnorm / (1. + cnorm))
+
+    npt = len(xout)
+
+    x = (xout[1:] + xout[:-1]) * 1000 / 2 / rs
+
+    n0 = 2. * mu
+
+    integrand = np.exp(n0) * np.exp(- n0 * x ** (1. / mu))
+
+    return integrand * fcc
+
+
+# Isothermal sphere function
+def f_iso_pm(xout, c200, r200, delta=200.):
+    '''
+    Theano function for the cored isothermal sphere mass profile (King 1962)
+
+    .. math::
+
+        M(r) = f_c R_{\\Delta}^3 \\left[ \\ln(x + \\sqrt{1+x^2}) - \\frac{x}{\\sqrt{1+x^2}} \\right]
+
+    with :math:`x=r/R_{\\Delta}` and
+
+    .. math::
+
+        f_c = \\frac{\\Delta}{3} \\frac{c^3}{\\ln(1+c)- c/(1+c)}
+
+    :param xout: Radius
+    :param c200: concentration
+    :param r200: Scale radius
+    :param delta: Overdensity
+    :return: Enclosed mass
+    '''
+
+    fcc = delta / 3. * c200 ** 3 / (pm.math.log(1. + c200) - c200 / (1. + c200))
+
+    x = xout / r200
+
+    fx = pm.math.log(x + pm.math.sqrt(1. + x ** 2)) - x / pm.math.sqrt(1. + x ** 2)
+
+    return r200 ** 3 * fcc * fx
+
+
+def f_iso_np(xout, pars, delta=200.):
+    '''
+    Numpy function for the cored isothermal sphere mass profile (see :func:`hydromass.functions.f_iso_pm`)
+
+    :param xout: Radius
+    :type xout: numpy.ndarray
+    :param pars: 2D array with the chains of parameters of the mass model (cdelta, rs, and mu)
+    :type pars: numpy.ndarray
+    :param delta: Overdensity
+    :type delta: float
+    :return: Enclosed mass
+    :rtype: numpy.ndarray
+    '''
+
+    c200 = pars[:, 0]
+
+    r200 = pars[:, 1]
+
+    npt = len(xout)
+
+    npars = len(c200)
+
+    c200mul = np.repeat(c200, npt).reshape(npars, npt)
+
+    r200mul = np.repeat(r200, npt).reshape(npars, npt)
+
+    fcc = delta / 3. * c200mul ** 3 / (np.log(1. + c200mul) - c200mul / (1. + c200mul))
+
+    xoutmul = np.tile(xout, npars).reshape(npars, npt)
+
+    x = xoutmul / r200mul
+
+    fx = np.log(x + np.sqrt(1. + x ** 2)) - x / np.sqrt(1. + x ** 2)
+
+    return r200mul ** 3 * fcc * fx
+
+
+# NFW function
+
+
+
+def f_nfw_pm(xout, c200, r200, delta=200.):
+    '''
+    Theano function for the Navarro-Frenk-White mass profile (Navarro et al. 1996)
+
+    .. math::
+
+        M(r) = f_c R_{\\Delta}^3 \\left[ \\ln(1 + x) - \\frac{x}{1+x}\\right]
+
+    with :math:`x=r/R_{\\Delta}` and
+
+    .. math::
+
+        f_c = \\frac{\\Delta}{3} \\frac{c^3}{\\ln(1+c)- c/(1+c)}
+
+    :param xout: Radius
+    :param c200: concentration
+    :param r200: Scale radius
+    :param delta: Overdensity
+    :return: Enclosed mass
+    '''
+
+    fcc = delta / 3. * c200 ** 3 / (pm.math.log(1. + c200) - c200 / (1. + c200))
+
+    x = xout / r200 * c200
+
+    fx = pm.math.log(1. + x) - x / (1. + x)
+
+    return r200 ** 3 * fcc / c200 ** 3 * fx
+
+def rho_nfw_cr(radii, c200, r200, delta=200.):
+    # Theano function for the Navarro-Frank-White density profile (Navarro et al. 1996)
+    # Should be multiplied by rho_crit(z)
+    r = (radii[1:] + radii[:-1]) / 2 * 1000.
+    delta_crit = (delta / 3) * (c200 ** 3) * (pm.math.log(1. + c200) - c200 / (1 + c200)) ** (-1)
+    return delta_crit / ((c200 * r / r200) * ((1. + (c200 * r / r200)) ** 2))
+
+def rho_nfw_cr_np(radii, c200, r200, delta=200.):
+    # Theano function for the Navarro-Frank-White density profile (Navarro et al. 1996)
+    # Should be multiplied by rho_crit(z)
+    r = (radii[1:] + radii[:-1]) / 2 * 1000.
+    delta_crit = (delta / 3) * (c200 ** 3) * (np.log(1. + c200) - c200 / (1 + c200)) ** (-1)
+    return delta_crit / ((c200 * r / r200) * ((1. + (c200 * r / r200)) ** 2))
+
+def f_nfw_np(xout, pars, delta=200.):
+    '''
+    Numpy function for the NFW profile (see :func:`hydromass.functions.f_nfw_pm`)
+
+    :param xout: Radius
+    :type xout: numpy.ndarray
+    :param pars: 2D array with the chains of parameters of the mass model (cdelta, rs, and mu)
+    :type pars: numpy.ndarray
+    :param delta: Overdensity
+    :type delta: float
+    :return: Enclosed mass
+    :rtype: numpy.ndarray
+    '''
+    c200 = pars[:, 0]
+
+    r200 = pars[:, 1]
+
+    npt = len(xout)
+
+    npars = len(c200)
+
+    c200mul = np.repeat(c200, npt).reshape(npars, npt)
+
+    r200mul = np.repeat(r200, npt).reshape(npars, npt)
+
+    fcc = delta / 3. * c200mul ** 3 / (np.log(1. + c200mul) - c200mul / (1. + c200mul))
+
+    xoutmul = np.tile(xout, npars).reshape(npars, npt)
+
+    x = xoutmul / r200mul * c200mul
+
+    fx = np.log(1. + x) - x / (1. + x)
+
+    return r200mul ** 3 * fcc / c200mul ** 3 * fx
+
+
+# Hernquist function
+def f_her_pm(xout, c200, r200, delta=200.):
+    '''
+    Theano function for the Hernquist (1990) mass profile,
+
+    .. math::
+
+        M(r) = f_c R_{\\Delta}^3 \\frac{x^2}{(x+1)^2}
+
+    with :math:`x=r/R_{\\Delta}` and
+
+    .. math::
+
+        f_c = \\frac{\\Delta}{3} \\frac{c^3}{\\ln(1+c)- c/(1+c)}
+
+    :param xout: Radius
+    :param c200: concentration
+    :param r200: Scale radius
+    :param delta: Overdensity
+    :return: Enclosed mass
+    '''
+    fcc = delta / 3. * c200 ** 3 / (pm.math.log(1. + c200) - c200 / (1. + c200))
+
+    x = xout / r200
+
+    fx = x ** 2. / (x + 1.) ** 2
+
+    return r200 ** 3 * fcc * fx
+
+
+def f_phantom_rar_pm(xout, g_cross, mbar = 0):
+    '''
+    RAR fitting to the mass profile. Since g_obs = F(g_bar), we can write HEE with equivalent MOND mass g_obs * r^2 / G
+
+    :param xout:
+    :param g_cross:
+    :return:
+    '''
+
+    g_bar = mbar * const_G_Msun_kpc / xout ** 2
+
+    g_obs = g_bar / (1 - pm.math.exp(-pm.math.sqrt(g_bar / pm.math.exp(g_cross))))
+
+    return (g_obs - g_bar) * xout ** 2 / const_G_Msun_kpc
+
+
+def f_phantom_rar_np(xout, pars, mbar = 0):
+    '''
+    RAR fitting to the mass profile. See (see :func:`hydromass.functions.f_phantom_rar_pm`)
+
+    :param xout:
+    :param g_cross:
+    :return:
+    '''
+
+    g_cross = pars[:, 0]
+
+    g_bar = mbar.T * const_G_Msun_kpc / xout[np.newaxis, :] ** 2
+
+    g_obs = g_bar / (1 - np.exp(-np.sqrt(g_bar / np.exp(g_cross[:, np.newaxis]))))
+
+    return (g_obs - g_bar) * xout[np.newaxis, :] ** 2 / const_G_Msun_kpc
+
+
+def f_missing_mass_pm(xout, logMtot, rs):
+    Mtot = pm.math.exp(logMtot)
+
+    R = xout / rs
+
+    return Mtot * R ** 3 / (1 + R) ** 3
+
+
+def f_missing_mass_np(xout, pars):
+    logMtot = pars[:, 0]
+    rs = pars[:, 1]
+    Mtot = pm.math.exp(logMtot)
+
+    R = xout / rs
+
+    return Mtot * R ** 3 / (1 + R) ** 3
+
+
+
+
+def f_her_np(xout, pars, delta=200.):
+    '''
+    Numpy function for the Hernquist (1990) mass profile (see :func:`hydromass.functions.f_her_pm`)
+
+    :param xout: Radius
+    :type xout: numpy.ndarray
+    :param pars: 2D array with the chains of parameters of the mass model (cdelta, rs, and mu)
+    :type pars: numpy.ndarray
+    :param delta: Overdensity
+    :type delta: float
+    :return: Enclosed mass
+    :rtype: numpy.ndarray
+    '''
+    c200 = pars[:, 0]
+
+    r200 = pars[:, 1]
+
+    npt = len(xout)
+
+    npars = len(c200)
+
+    c200mul = np.repeat(c200, npt).reshape(npars, npt)
+
+    r200mul = np.repeat(r200, npt).reshape(npars, npt)
+
+    fcc = delta / 3. * c200mul ** 3 / (np.log(1. + c200mul) - c200mul / (1. + c200mul))
+
+    xoutmul = np.tile(xout, npars).reshape(npars, npt)
+
+    x = xoutmul / r200mul
+
+    fx = x ** 2. / (x + 1.) ** 2
+
+    return r200mul ** 3 * fcc * fx
+
+
+# Burkert function
+def f_bur_pm(xout, c200, r200, delta=200.):
+    '''
+    Theano function for the Burkert mass profile (Salucci & Burkert 2000),
+
+    .. math::
+
+        M(r) = f_c R_{\\Delta}^3 \\left[ \\ln(1+x^2) + 2\\ln(1+x) -2\\arctan(x) \\right]
+
+    with :math:`x=r/R_{\\Delta}` and
+
+    .. math::
+
+        f_c = \\frac{\\Delta}{3} \\frac{c^3}{\\ln(1+c)- c/(1+c)}
+
+    :param xout: Radius
+    :param c200: concentration
+    :param r200: Scale radius
+    :param delta: Overdensity
+    :return: Enclosed mass
+    '''
+    fcc = delta / 3. * c200 ** 3 / (pm.math.log(1. + c200) - c200 / (1. + c200))
+
+    x = xout / r200
+
+    fx = pm.math.log(1. + x ** 2) + 2. * pm.math.log(1. + x) - 2. * tt_arctan(x)
+
+    return r200 ** 3 * fcc * fx
+
+
+def f_bur_np(xout, pars, delta=200.):
+    '''
+    Numpy function for the Burkert mass profile (Salucci & Burkert 2000), see :func:`hydromass.functions.f_bur_pm`
+
+    :param xout: Radius
+    :type xout: numpy.ndarray
+    :param pars: 2D array with the chains of parameters of the mass model (cdelta, rs, and mu)
+    :type pars: numpy.ndarray
+    :param delta: Overdensity
+    :type delta: float
+    :return: Enclosed mass
+    :rtype: numpy.ndarray
+    '''
+    c200 = pars[:, 0]
+
+    r200 = pars[:, 1]
+
+    npt = len(xout)
+
+    npars = len(c200)
+
+    c200mul = np.repeat(c200, npt).reshape(npars, npt)
+
+    r200mul = np.repeat(r200, npt).reshape(npars, npt)
+
+    fcc = delta / 3. * c200mul ** 3 / (np.log(1. + c200mul) - c200mul / (1. + c200mul))
+
+    xoutmul = np.tile(xout, npars).reshape(npars, npt)
+
+    x = xoutmul / r200mul
+
+    fx = np.log(1. + x ** 2) + 2. * np.log(1. + x) - 2. * np.arctan(x)
+
+    return r200mul ** 3 * fcc * fx
+
+class MassModel:
+    '''
+    Class defining mass models to be passed to the hydromass :class:`hydromass.mhyd.Mhyd` class for optimization.
+
+    :param massmod:
+        Name of the chosen mass model. Currently available mass models are:
+            - 'NFW': Navarro-Frenk-White (1996) model, :func:`hydromass.functions.f_nfw_pm`
+            - 'EIN2': Analytic 2-parameter Einasto (1965) model with :math:`\\alpha=0.2` (Mamon & Lokas 2005), :func:`hydromass.functions.f_ein2_pm`
+            - 'EIN3': Numerically integrated 3-parameter Einasto (1965) model with free :math:`\alpha`, :func:`hydromass.functions.f_ein3_pm`
+            - 'HER': Hernquist (1990) model, :func:`hydromass.functions.f_her_pm`
+            - 'ISO': Cored isothermal sphere model (King 1962), :func:`hydromass.functions.f_iso_pm`
+            - 'BUR': Salucci & Burkert (2000) model, :func:`hydromass.functions.f_bur_pm`
+    :type massmod: str
+    :param delta: Chosen fit overdensity. Defaults to 200
+    :type delta: float
+    :param start: 1D array containing the central values of the Gaussian prior on the model parameters. If None, the priors are set automatically to "sensible" values (for the galaxy cluster case...)
+    :type start: numpy.ndarray
+    :param sd: 1D array containing the standard deviations of the Gaussian prior on the model parameters. If None, weak priors are set automatically to remain within "sensible" values
+    :type sd: numpy.ndarray
+    :param limits: 2D array including the upper and lower boundaries of the parameter values. If None, the boundaries are set automatically to remain within "sensible" values
+    :type limits: numpy.ndarray
+    :param fix: 1D array setting whether each parameter of the mass model is fitted (False) or fixed (True). If None, all the parameters are free to vary.
+    :type fix: numpy.ndarray
+    '''
+    available_models = ['NFW', 'ISO', 'EIN2', 'EIN3', 'BUR', 'HER', 'SERSIC', 'RAR', 'EMOND', 'GMOND', 'MISSING_MASS']
+
+    @classmethod
+    def help(cls):
+        print(f'Available mass models: {cls.available_models}.')
+
+    def __init__(self, massmod, delta = 200., start = None, sd = None, limits = None, fix = None):
+
+        if massmod not in self.available_models:
+            raise ValueError(f'Unknown Mass model {massmod} . Available mass models: {self.available_models}.')
+
+        self.massmod = massmod
+        self.delta = delta
+
+        if massmod == 'NFW':
+            self.setup_NFW(start = start, sd = sd, limits = limits, fix = fix)
+        elif massmod == 'ISO':
+            self.setup_ISO(start = start, sd = sd, limits = limits, fix = fix)
+        elif massmod == 'EIN2':
+            self.setup_EIN2(start = start, sd = sd, limits = limits, fix = fix)
+        elif massmod == 'EIN3':
+            self.setup_EIN3(start = start, sd = sd, limits = limits, fix = fix)
+        elif massmod == 'BUR':
+            self.setup_BUR(start = start, sd = sd, limits = limits, fix = fix)
+        elif massmod == 'HER':
+            self.setup_HER(start = start, sd = sd, limits = limits, fix = fix)
+        elif massmod == 'SERSIC':
+            self.setup_SERSIC(start = start, sd = sd, limits = limits, fix = fix)
+        elif massmod == 'RAR':
+            self.setup_RAR(start = start, sd = sd, limits = limits, fix = fix)
+        elif massmod == 'MISSING_MASS':
+            self.setup_missing_mass(start = start, sd = sd, limits = limits, fix = fix)
+        elif massmod == 'GMOND':
+            self.setup_GMOND(start = start, sd = sd, limits = limits, fix = fix)
+        elif massmod == 'EMOND':
+            self.setup_EMOND(start = start, sd = sd, limits = limits, fix = fix)
+
+    def check(self, start = None, sd = None, limits = None, fix = None):
+
+        assert len(start) == self.npar, 'Number of starting parameters does not match function.'
+        assert len(sd) == self.npar, 'Shape of sd does not match function.'
+        assert (limits.shape == (self.npar, 2)), 'Shape of limits does not match function.'
+        assert (len(fix) == self.npar), 'Shape of fix vectory does not match function.'
+
+        self.start = start
+        self.sd = sd
+        self.limits = limits
+        self.fix = fix
+
+    def setup_NFW(self, start = None, sd = None, limits = None, fix = None):
+        self.func_pm = f_nfw_pm
+        self.func_np = f_nfw_np
+
+        self.rho_pm = rho_nfw_cr
+        self.rho_np = rho_nfw_cr_np
+
+        self.npar = 2
+        self.parnames = ['cdelta', 'rdelta']
+
+        if start is None:
+            start = [4., 1000.]
+        if sd is None:
+            sd = [4., 1000.]
+        if limits is None:
+            limits = np.empty((self.npar, 2))
+            limits[0] = [0.5, 15.]
+            limits[1] = [100., 3000.]
+        if fix is None:
+            fix = [False, False]
+
+        self.check(start = start, sd = sd, limits = limits, fix = fix)
+
+    def setup_ISO(self, start = None, sd = None, limits = None, fix = None):
+        self.func_pm = f_iso_pm
+        self.func_np = f_iso_np
+
+        self.npar = 2
+        self.parnames = ['cdelta', 'rdelta']
+
+        if start is None:
+            start = [7., 440.]
+        if sd is None:
+            sd = [4., 200.]
+        if limits is None:
+            limits = np.empty((self.npar, 2))
+            limits[0] = [1., 30.]
+            limits[1] = [50., 2000.]
+        if fix is None:
+            fix = [False, False]
+
+        self.check(start = start, sd = sd, limits = limits, fix = fix)
+
+    def setup_EIN2(self, start = None, sd = None, limits = None, fix = None):
+        self.func_pm = f_ein2_pm
+        self.func_np = f_ein2_np
+
+        self.npar = 2
+        self.parnames = ['cdelta', 'rdelta']
+
+        if start is None:
+            start = [1.8, 700.]
+        if sd is None:
+            sd = [1.5, 300.]
+        if limits is None:
+            limits = np.empty((self.npar, 2))
+            limits[0] = [0., 5.]
+            limits[1] = [100., 1800.]
+        if fix is None:
+            fix = [False, False]
+
+        self.check(start = start, sd = sd, limits = limits, fix = fix)
+
+    def setup_EIN3(self, start = None, sd = None, limits = None, fix = None):
+        self.func_pm = f_ein3_pm
+        self.func_np = f_ein3_np
+
+        self.npar = 3
+        self.parnames = ['cdelta', 'rdelta', 'mu']
+
+        self.rho_pm = rho_ein3_pm
+        self.rho_np = rho_ein3_np
+
+        if start is None:
+            start = [1.8, 700., 5.]
+        if sd is None:
+            sd = [1.5, 300., 3.]
+        if limits is None:
+            limits = np.empty((self.npar, 2))
+            limits[0] = [0., 5.]
+            limits[1] = [100., 1800.]
+            limits[2] = [0., 20.]
+        if fix is None:
+            fix = [False, False, False]
+
+        self.check(start = start, sd = sd, limits = limits, fix = fix)
+
+    def setup_SERSIC(self, start = None, sd = None, limits = None, fix = None):
+        # Using Prugniel & Simien 1997 Eq. B6 approximation for the density of the Sersic model.
+        self.func_pm = f_sersic_pm
+        self.func_np = f_sersic_np
+
+        self.npar = 5
+        self.parnames = ['cdelta_sersic', 'rdelta_sersic', 'b', 'n', 'alpha']
+
+        self.rho_pm = None  # rho_ein3_pm
+        self.rho_np = None  # rho_ein3_np
+
+        if start is None:
+            # n = 4
+            # b = 2n - 1/3 + 0.009876/n = 7.669135666666667
+            # alpha = 1 - 1/(2n) = 0.875
+            start = [8, 0.5, 7.669135666666667, 4., 0.875]
+        if sd is None:
+            sd = [6., 50., 4., 4., 1.]
+        if limits is None:
+            limits = np.empty((self.npar, 2))
+            limits[0] = [1., 100.]
+            limits[1] = [0., 100.]
+            limits[2] = [0., 14.]
+            limits[3] = [1., 10.]
+            limits[4] = [0., 3.]
+        if fix is None:
+            fix = [False, False, True, True, True]
+            print('Note that in SERSIC modeling, n, b, and alpha are fixed to the n=4 case from Prugniel+1997')
+            print('   to change this behaviour change MassModel.fix property')
+
+        self.check(start = start, sd = sd, limits = limits, fix = fix)
+
+    def setup_BUR(self, start = None, sd = None, limits = None, fix = None):
+        self.func_pm = f_bur_pm
+        self.func_np = f_bur_np
+
+        self.npar = 2
+        self.parnames = ['cdelta', 'rdelta']
+
+        if start is None:
+            start = [4.5, 200.]
+        if sd is None:
+            sd = [3., 100.]
+        if limits is None:
+            limits = np.empty((self.npar, 2))
+            limits[0] = [0., 20.]
+            limits[1] = [20., 800.]
+        if fix is None:
+            fix = [False, False]
+
+        self.check(start = start, sd = sd, limits = limits, fix = fix)
+
+    def setup_HER(self, start = None, sd = None, limits = None, fix = None):
+        self.func_pm = f_her_pm
+        self.func_np = f_her_np
+
+        self.npar = 2
+        self.parnames = ['cdelta', 'rdelta']
+
+        if start is None:
+            start = [1.9, 1000.]
+        if sd is None:
+            sd = [2., 400.]
+        if limits is None:
+            limits = np.empty((self.npar, 2))
+            limits[0] = [0., 6.]
+            limits[1] = [200., 2500.]
+        if fix is None:
+            fix = [False, False]
+
+        self.check(start = start, sd = sd, limits = limits, fix = fix)
+
+    def setup_RAR(self, start = None, sd = None, limits = None, fix = None):
+        self.func_pm = f_phantom_rar_pm
+        self.func_np = f_phantom_rar_np
+
+        self.rho_pm = None
+        self.rho_np = None
+
+        self.npar = 1
+        self.parnames = ['g_cross']
+
+        if start is None:
+            start = [np.log(1.2e-8)]
+        if sd is None:
+            sd = [0.2]
+        if limits is None:
+            limits = np.empty((self.npar, 2))
+            limits[0] = [-23., -14.]
+        if fix is None:
+            fix = [False]
+
+        self.check(start = start, sd = sd, limits = limits, fix = fix)
+
+    def setup_missing_mass(self, start = None, sd = None, limits = None, fix = None):
+        self.func_pm = f_missing_mass_pm
+        self.func_np = f_missing_mass_np
+
+        self.rho_pm = None
+        self.rho_np = None
+
+        self.npar = 2
+        self.parnames = ['log M_tot,miss', 'rs_miss']
+
+        if start is None:
+            start = [7, 100]
+        if sd is None:
+            sd = [10, 500]
+        if limits is None:
+            limits = np.empty((self.npar, 2))
+            limits[0] = [0, 50]
+            limits[1] = [10, 10000]
+        if fix is None:
+            fix = [False, False]
+
+        self.check(start = start, sd = sd, limits = limits, fix = fix)
+
+    def setup_GMOND(self, start = None, sd = None, limits = None, fix = None):
+        self.func_pm = f_gmond_pm
+        self.func_np = f_gmond_np
+
+        self.rho_pm = None
+        self.rho_np = None
+
+        self.npar = 3
+        self.parnames = ['log_C', 'log_g_0', 'sigma_g']
+
+        if start is None:
+            start = [np.log(1e-4), np.log(1.2e-8), 2]
+        if sd is None:
+            sd = [2., 2., 2.]
+        if limits is None:
+            limits = np.empty((self.npar, 2))
+            limits[0] = [np.log(1e-5), np.log(1e-3)]
+            limits[1] = [-23., -14.]
+            limits[2] = [0.1, 5.]
+        if fix is None:
+            fix = [False, False, False]
+
+        self.check(start = start, sd = sd, limits = limits, fix = fix)
+
+    def setup_EMOND(self, start = None, sd = None, limits = None, fix = None):
+        self.func_pm = f_emond_pm
+        self.func_np = f_emond_np
+
+        self.rho_pm = None
+        self.rho_np = None
+
+        self.npar = 4
+        self.parnames = ['alpha1', 'alpha2', 'log_g1', 'log_g2']
+
+        if start is None:
+            start = [1.4, -1.2, np.log(2.3e-8), np.log(1.2e-9)]
+        if sd is None:
+            sd = [2., 2., 2., 2.]
+        if limits is None:
+            limits = np.empty((self.npar, 2))
+            limits[0] = [-1., 3.]
+            limits[1] = [-3., 1.]
+            limits[2] = [-23., -14.]
+            limits[3] = [-23., -14.]
+        if fix is None:
+            fix = [False, False, False, False]
+
+        self.check(start = start, sd = sd, limits = limits, fix = fix)
+
+    #
+    # def __call__(self, x, pars):
+    #
+    #     return self.func_pm(x, *pars)
+
+    def __call__(self, x, pars):
+
+        return self.func_np(x, *pars, delta = self.delta)

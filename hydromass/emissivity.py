@@ -1,6 +1,6 @@
 import copy
 import os
-
+import nlopt
 import ipdb
 import  numpy as np
 import matplotlib.pyplot as plt
@@ -261,12 +261,14 @@ def vikh_temp(x, pars, Tmin):
     t2=np.power(1.+(x/rt)**2,-c/2)
     return T0*numer/denom*t2
 
+
+
 def vikh_temp_average(R, pars):
     T0 = pars[0]
     R500 = pars[1]
     rcool = pars[2]
     acool = pars[3]
-    Tmin = pars[4]
+    Tmin_over_T0 = pars[4]
     c = pars[5]
     rt = pars[6]
     b=2
@@ -275,7 +277,7 @@ def vikh_temp_average(R, pars):
     r = R / R500
     #
     x = (r/rcool)**acool
-    t1 = (Tmin/T0 + x) / (1+x)
+    t1 = (Tmin_over_T0 + x) / (1+x)
     t2 = (r/rt)**(-a) / ((1+(r/rt)**b)**c/b)
     return T0*t1*t2# T0 * 1.35 * (0.45+(x/0.045)**1.9) / (1+(x/0.045)**1.9) / (1+(x/0.6)**2)**0.45
 
@@ -340,27 +342,91 @@ def variable_ccf(Mhyd, cosmo, z, nh, rmf, method='interp', abund='aspl', elow=0.
 
     if method=='fit':
 
-        def optim_kt(pars):
-
-            mod_kt = vikh_temp_average(spec_data.rref_x, pars)
-
-            chi2 = np.sum((mod_kt - spec_data.temp_x) ** 2 / spec_data.errt_x ** 2)
-
-            if np.any(pars < 0.):
-
-                chi2 = chi2 + 1e10
-
-            return chi2
-
         R500 = 600
 
         T0 = np.mean(spec_data.temp_x)
 
-        pars_temp = [T0, R500, 0.045, 1.9, 0.45*T0, 0.9, 0.6]
+        pars_temp = np.array([T0, R500, 0.045, 1.9, 0.45, 0.9, 0.6])
 
-        res = minimize(optim_kt, pars_temp, method='Nelder-Mead')
+        def optim_kt(facts, *args):
 
-        ktprof = vikh_temp_average(bins * Mhyd.amin2kpc, res['x'])
+            tpars = np.exp(facts) * pars_temp
+
+            mod_kt = vikh_temp_average(spec_data.rref_x, tpars)
+
+            chi2 = np.sum((mod_kt - spec_data.temp_x) ** 2 / spec_data.errt_x ** 2)
+
+            prior = np.sum(0.5 * ((facts - 0) / 1)**2) # Don't change much from V06 values
+
+            # if np.any(facts < 0.):
+            #
+            #     chi2 = chi2 + 1e10
+
+            return chi2 + prior
+
+
+        facts_temp = [0, 0, 0, 0, 0, 0, 0]
+
+        lbounds = [-10, -10, -10, -10, -10, -10, -10]
+
+        ubounds = [10, 10, 10, 10, 10, 10, 10]
+
+        bounds = [(l,u) for l,u in zip(lbounds, ubounds)]
+
+        res = minimize(optim_kt, facts_temp, method='Nelder-Mead', options={'maxfev': 5000, 'maxiter': 5000})
+
+        fpars = res['x']
+
+        for i, (p, l, u) in enumerate(zip(fpars, lbounds, ubounds)):
+            if p < l:
+                fpars[i] = l
+
+            if p > u:
+                fpars[i] = u
+
+
+        ktprof = vikh_temp_average(bins * Mhyd.amin2kpc, np.exp(fpars) * pars_temp)
+
+        Mhyd.logger.info(res)
+
+
+        methods = ('LN_SBPLX', 'LN_BOBYQA') # 'LN_NELDERMEAD' , 'LN_COBYLA'
+
+        flike = res.fun
+        maxloops = 10
+        sigdelta = 0.01
+        initlike = optim_kt(fpars)
+        for i in range(maxloops):
+            Mhyd.logger.info('Fitting (iteration %i)' % (i+1))
+
+
+            for method_nlopt in methods:
+                # nlopt methods
+                meth = getattr(nlopt, method_nlopt.upper())
+                opt = nlopt.opt(meth, len(fpars))
+                opt.set_min_objective(optim_kt)
+                opt.set_xtol_abs(1e-3)
+                opt.set_lower_bounds(lbounds)
+                opt.set_upper_bounds(ubounds)
+                try:
+                    fpars = opt.optimize(fpars)
+                    flike = -opt.last_optimum_value()
+                    num_evals = opt.get_numevals()
+                    Mhyd.logger.info(f'Using method {method_nlopt}...{num_evals} steps')
+                except ValueError as e:
+                    Mhyd.logger.info('  Optimization failed: "%s"' % str(e))
+
+
+            if abs(initlike-flike) < sigdelta:
+                # fit quality stayed the same
+                break
+            initlike = flike
+        else:
+            Mhyd.logger.info('Warning: might be a bad fit, success = False')
+
+        ktprof = vikh_temp_average(bins * Mhyd.amin2kpc, np.exp(fpars) * pars_temp)
+
+        #ktprof = np.clip(ktprof, 0.008, 64)
 
         if outkt is not None:
 
@@ -391,7 +457,10 @@ def variable_ccf(Mhyd, cosmo, z, nh, rmf, method='interp', abund='aspl', elow=0.
 
             plt.ylabel('kT [keV]', fontsize=28)
 
+            plt.xscale('log')
+
             plt.savefig(outkt)
+
 
 
     else:
@@ -568,6 +637,9 @@ def variable_ccf(Mhyd, cosmo, z, nh, rmf, method='interp', abund='aspl', elow=0.
 
     if out_cfact_file:
         with open(out_cfact_file, 'w') as f:
+            if method == 'fit':
+                val = [float(x) for x in np.exp(fpars) * pars_temp]
+                print(f'# V06 kT fit: {val}', file=f)
             print('#           R           e_R            kT             Z            CR          FLUX           LUM ', file = f)
             for i in range(nbin):
                 print(f'{bins[i]:13.7g} {ebins[i]:13.7g} {ktprof[i]:13.7g} {zfe_prof[i]:13.7g} {cr_prof[i]:13.7g} {fx_prof[i]:13.7g} {lum_prof[i]:13.7g}', file=f)
