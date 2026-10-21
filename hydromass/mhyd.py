@@ -45,7 +45,8 @@ from .pyutils import create_logger, warning
 from .conversion_factor_emissivity import calc_emissivity, ConversionFactor, FitCCFTable
 from .utility import sb_utils, common_utils, spec_utils, mass_utils, ccf_utils, forw_utils, gp_utils
 from .likelihoods import get_density, likelihood_sb, get_metal, likelihood_metal, kt_from_mass, likelihood_kt, get_ccf, kt_from_forw, kt_from_gp
-from .show_fit import plot_likelihood
+from .show_fit import compute_products, save_products, plot_likelihood, plot_mass, plot_mass_fractions, plot_corner, plot_thermodynamics
+from .get_delta import calc_delta_quantities
 
 
 __all__ = ['Run_Mhyd_PyMC3', 'Mhyd']
@@ -1398,7 +1399,7 @@ class Mhyd:
             rmin_amin=None, rmax_amin=None,
             p0_prior=None, p0_type='sb',
             num_warmup=1000, num_samples=2000, target_accept=0.95, num_chains=4, nuts_sampler="numpyro",
-            find_map=True,
+            find_map=True, deltas=(2500, 1000, 500, 200),
             ):
         '''
         :param fit_SB:
@@ -1456,6 +1457,8 @@ class Mhyd:
             Sampler used for the fitting. Default numpyro
         :param find_map:
             Whether to run a maximum a posteriori fit first to initialize the sampler. Default True
+        :param deltas:
+            Overdensities at which R_delta, M_delta, Mgas, Mstar and mass fractions are computed and saved to mdelta.dat. Default (2500, 1000, 500, 200)
         '''
         if (fit_SB is False) and (fit_kT is False) and (fit_Z_Ab is False) and (fit_SZ is False) and (fit_WL is False):
             raise ValueError('Nothing to do. At least one of [fit_SB, fit_kT, fit_Z_Ab, fit_SZ, fit_WL] must be set to True')
@@ -1474,31 +1477,38 @@ class Mhyd:
 
         mass_utils(self, dict_utils, mstar=mstar, p0_prior=p0_prior, p0_type=p0_type)
 
+        # Name of the mass model combination, e.g. NFW+SERSIC, used in plot names and legends
+        model_tag = '+'.join([m.massmod for m in models_mass] + [m.massmod for m in (model_mstar, model_missing_mass) if m is not None])
 
-        hydro_model = pm.Model()
-        with hydro_model:
-            params = dict()
+        # All the outputs of this fit go to a folder named after the model combination
+        self.fit_dir = os.path.join(self.dir, model_tag)
+        os.makedirs(self.fit_dir, exist_ok=True)
 
-            get_density(params, dict_utils, self, fit_bkg=fit_bkg)
-
-            get_metal(params, model_Z_Ab, self, dict_utils)
-
-            if fit_Z_Ab:
-                likelihood_metal(params, model_Z_Ab, self, dict_utils)
-
-            kt_from_mass(params, models_mass, self, dict_utils, mstar=mstar, model_mstar=model_mstar, model_missing_mass=model_missing_mass)
-
-            if fit_kT:
-                likelihood_kt(params, self, dict_utils)
-
-            get_ccf(params, self, dict_utils, self.conversion_factor_type)
-
-
-            if fit_SB:
-                likelihood_sb(params, dict_utils, self, fit_bkg=fit_bkg)
-
-        trace_path = os.path.join(self.dir, 'trace.nc')
+        trace_path = os.path.join(self.fit_dir, f'trace_{model_tag}.nc')
         if not os.path.isfile(trace_path):
+            hydro_model = pm.Model()
+            with hydro_model:
+                params = dict()
+
+                get_density(params, dict_utils, self, fit_bkg=fit_bkg)
+
+                get_metal(params, model_Z_Ab, self, dict_utils)
+
+                if fit_Z_Ab:
+                    likelihood_metal(params, model_Z_Ab, self, dict_utils)
+
+                kt_from_mass(params, models_mass, self, dict_utils, mstar=mstar, model_mstar=model_mstar, model_missing_mass=model_missing_mass)
+
+                if fit_kT:
+                    likelihood_kt(params, self, dict_utils)
+
+                get_ccf(params, self, dict_utils, self.conversion_factor_type)
+
+
+                if fit_SB:
+                    likelihood_sb(params, dict_utils, self, fit_bkg=fit_bkg)
+
+
             self.logger.info('Starting the sampler...')
 
             if nuts_sampler in ('numpyro', 'blackjax') and not isjax:
@@ -1520,7 +1530,24 @@ class Mhyd:
 
         trace = az.from_netcdf(trace_path)
 
-        plot_likelihood(self, trace, dict_utils, fit_SB=fit_SB, fit_kT=fit_kT, fit_Z_Ab=fit_Z_Ab, fit_bkg=fit_bkg)
+
+
+
+
+        self.delta_results = calc_delta_quantities(self, trace, dict_utils, model_mstar=model_mstar, mstar=mstar, deltas=deltas,
+                                                   outfile=os.path.join(self.fit_dir, f'{model_tag}_results.dat'))
+
+        # Everything needed for the plots; several fitted Mhyd objects can be plotted together with hydromass.show_fit.plot_fits
+        self.fit_products = compute_products(self, trace, dict_utils, model_tag, models_mass, model_mstar=model_mstar, mstar=mstar,
+                                             model_missing_mass=model_missing_mass, fit_SB=fit_SB, fit_kT=fit_kT, fit_Z_Ab=fit_Z_Ab,
+                                             fit_bkg=fit_bkg, delta_results=self.delta_results)
+        save_products(self.fit_products, os.path.join(self.fit_dir, f'{model_tag}_products.fits'))
+
+        plot_likelihood([self.fit_products], self.fit_dir, suffix=f'_{model_tag}')
+        plot_mass([self.fit_products], outfile=os.path.join(self.fit_dir, f'mass_{model_tag}.pdf'))
+        plot_mass_fractions([self.fit_products], outfile=os.path.join(self.fit_dir, f'mass_fractions_{model_tag}.pdf'))
+        plot_corner([self.fit_products], outfile=os.path.join(self.fit_dir, f'corner_{model_tag}.pdf'))
+        plot_thermodynamics([self.fit_products], outfile=os.path.join(self.fit_dir, f'thermodynamics_{model_tag}.pdf'))
 
 
 

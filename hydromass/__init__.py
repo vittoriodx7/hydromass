@@ -18,5 +18,6 @@ from .utility_old import *
 from .galaxy_object import GalaxyObject
 from .model_abundance import Z_Ab_Model
 from .model_mass import MassModel
+from .show_fit import plot_fits
 
 from .conversion_factor_emissivity import calc_emissivity

@@ -113,17 +113,17 @@ def kt_from_mass(params, models, Mhyd, dict_utils,
     else:
         mstar_rref = pm.math.constant(0)
 
-    pm.Deterministic('mstar_model_rref', mstar_rref * Mhyd.mfact0 * 1e13)
+    if model_mstar is not None or mstar is not None:
+        pm.Deterministic('mstar_model_rref', mstar_rref * Mhyd.mfact0 * 1e13)
 
     if model_missing_mass is not None:
         Mhyd.logger.info('MISSING MASS PARAMETERS')
         pmod = pm.math.stack(model_missing_mass.pm_priors(Mhyd.logger), axis = 0)
 
         m_missing_mass_model_rref = model_missing_mass.func_pm(rref_m, *pmod)
+        pm.Deterministic('m_missing_mass_model_rref', m_missing_mass_model_rref * Mhyd.mfact0 * 1e13)
     else:
         m_missing_mass_model_rref = pm.math.constant(0)
-
-    pm.Deterministic('m_missing_mass_model_rref', m_missing_mass_model_rref * Mhyd.mfact0 * 1e13)
 
     nhconv = cgsamu * Mhyd.mu_e * cgskpc ** 3 / Msun  # Msun/kpc^3
     mgas_out = mgas_pm(rin_m, rout_m, params['ne_model_rref']) * nhconv / Mhyd.mfact0

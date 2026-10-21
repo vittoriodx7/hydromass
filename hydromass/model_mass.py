@@ -115,6 +115,31 @@ def f_ein2_pm(xout, c200, r200, delta=200.):
     return r200 ** 3 * fcc * fx
 
 
+def f_ein2claude_pm(xout, c200, r200, delta=200.):
+    '''
+    CLAUDE: Same 2-parameter Einasto model (mu = 5) as :func:`f_ein2_pm`, written with the pytensor regularized lower incomplete gamma
+    function instead of the custom EinastoFx Op, so that it can be converted to JAX (numpyro sampler) and differentiated automatically.
+
+    :param xout: Radius
+    :param c200: concentration
+    :param r200: Scale radius
+    :param delta: Overdensity
+    :return: Enclosed mass
+    '''
+    nn = 5.
+    n0 = 2. * nn
+    n1 = 3. * nn
+
+    fcc = delta / 3. * c200 ** 3 / (pm.math.log(1. + c200) - c200 / (1. + c200))
+
+    x = xout / r200
+
+    # Same expression as f_ein_mu(x, 5.)
+    fx = nn ** (1. - n1) / 2. ** n1 * np.exp(n0) * special.gamma(n1) * tt.gammainc(n1, n0 * x ** (1. / nn))
+
+    return r200 ** 3 * fcc * fx
+
+
 # 3-parameter Einasto function, we need to integrate the density numerically since the gradient is not analytical
 def f_ein3_pm(xout, c200, r200, mu, delta=200.):
     '''
@@ -896,7 +921,7 @@ class MassModel(Model):
     :param prior: List setting the prior type of each parameter, one of 'Uniform' (between limits), 'Normal' (start, sd) or 'TruncatedNormal' (start, sd, between limits). If None, a default prior type is set depending on the mass model.
     :type prior: list
     '''
-    available_models = ['NFW', 'ISO', 'EIN2', 'EIN3', 'BUR', 'HER', 'SERSIC', 'RAR', 'EMOND', 'GMOND', 'MISSING_MASS']
+    available_models = ['NFW', 'ISO', 'EIN2', 'EIN2CLAUDE', 'EIN3', 'BUR', 'HER', 'SERSIC', 'RAR', 'EMOND', 'GMOND', 'MISSING_MASS']
 
     @classmethod
     def help(cls):
@@ -917,6 +942,8 @@ class MassModel(Model):
             self.setup_ISO(start = start, sd = sd, limits = limits, fix = fix, prior = prior)
         elif massmod == 'EIN2':
             self.setup_EIN2(start = start, sd = sd, limits = limits, fix = fix, prior = prior)
+        elif massmod == 'EIN2CLAUDE':
+            self.setup_EIN2CLAUDE(start = start, sd = sd, limits = limits, fix = fix, prior = prior)
         elif massmod == 'EIN3':
             self.setup_EIN3(start = start, sd = sd, limits = limits, fix = fix, prior = prior)
         elif massmod == 'BUR':
@@ -985,6 +1012,32 @@ class MassModel(Model):
 
     def setup_EIN2(self, start = None, sd = None, limits = None, fix = None, prior = None):
         self.func_pm = f_ein2_pm
+        self.func_np = f_ein2_np
+
+        self.npar = 2
+        self.parnames = ['cdelta', 'rdelta']
+
+        if start is None:
+            start = [1.8, 700.]
+        if sd is None:
+            sd = [1.5, 300.]
+        if limits is None:
+            limits = np.empty((self.npar, 2))
+            limits[0] = [0., 5.]
+            limits[1] = [100., 1800.]
+        if fix is None:
+            fix = [False, False]
+
+        if prior is None:
+            prior = ['Uniform'] * self.npar
+
+        self.check(start = start, sd = sd, limits = limits, fix = fix, prior = prior)
+
+    def setup_EIN2CLAUDE(self, start = None, sd = None, limits = None, fix = None, prior = None):
+        '''
+        CLAUDE: 2-parameter Einasto model as EIN2, with the JAX compatible :func:`f_ein2claude_pm`. Same defaults as EIN2.
+        '''
+        self.func_pm = f_ein2claude_pm
         self.func_np = f_ein2_np
 
         self.npar = 2
