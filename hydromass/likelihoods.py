@@ -4,8 +4,9 @@ import numpy as np
 
 from .constants import cgsamu, cgskpc, Msun, y_prefactor, kev2erg, cgsMpc, cgsG, year
 from .utility import mgas_pm
+from .deproject import MyDeprojVol
 
-__all__ = ['get_density', 'likelihood_sb', 'get_metal', 'likelihood_metal', 'kt_from_mass', 'likelihood_kt', 'get_ccf']
+__all__ = ['get_density', 'likelihood_sb', 'get_metal', 'likelihood_metal', 'kt_from_mass', 'likelihood_kt', 'likelihood_sz', 'get_ccf']
 
 
 def get_density(params, dict_utils, Mhyd, fit_bkg = False):
@@ -224,6 +225,80 @@ def likelihood_kt(params, Mhyd, dict_utils):
         tproj = params[f'tproj_{i}']
 
         T_obs = pm.Normal(f'T_obs_{i}', mu = tproj[valid_spec], observed = this_spec_data.temp_x[valid_spec], sigma = this_spec_data.errt_x[valid_spec])  # temperature likelihood
+
+
+def likelihood_sz(params, Mhyd, dict_utils, fit_eta = False, nmore = 5):
+    '''
+    CLAUDE: SZ likelihood for each dataset in Mhyd.sz_data, from the model pressure params['press_rout'] (see :func:`kt_from_mass`).
+    Depending on sz_data.sz_fit, it fits the pressure ('P', 'logP') or the Compton y profile ('Y', 'logY'). Adapted from :func:`hydromass.mhyd.Run_Mhyd_PyMC3`.
+
+    :param fit_eta: Fit for eta = P_SZ / P_X, with a pm.Uniform('eta', lower=0.2, upper=5) prior. Default False.
+    :param nmore: nmore used to build the radial grid; the pressure is extrapolated over 2 * nmore extra shells out to 10 Mpc for the y projection. Default 5.
+    '''
+    rin_m = dict_utils['rin_m']
+    rout_m = dict_utils['rout_m']
+    ntm = dict_utils['ntm']
+
+    press_rout = params['press_rout']
+
+    if fit_eta:
+        Mhyd.logger.info('ETA PARAMETER')
+        Mhyd.logger.info("  pm.Uniform('eta', lower=0.2, upper=5)")
+        eta = pm.Uniform('eta', lower = 0.2, upper = 5)
+    else:
+        eta = 1
+
+    for i, (this_sz_data, index_sz) in enumerate(zip(Mhyd.sz_data, dict_utils['index_sz_list'])):
+
+        if this_sz_data.sz_fit in ['P', 'logP']:  # Fitting the pressure
+
+            Mhyd.logger.info(f'Pressure fit {this_sz_data.sz_fit}')
+
+            pfit = press_rout[index_sz] * eta  # P_SZ = P_X * eta
+
+            params[f'pfit_{i}'] = pm.Deterministic(f'pfit_{i}', pfit)
+
+            if this_sz_data.sz_fit == 'P':
+                P_obs = pm.MvNormal(f'P_obs_{i}', mu = pfit, observed = this_sz_data.pres_sz, cov = this_sz_data.covmat_sz)  # SZ pressure likelihood
+            else:
+                P_obs = pm.MvNormal(f'P_obs_{i}', mu = pm.math.log(pfit), observed = this_sz_data.logp_sz, cov = this_sz_data.covmat_sz)  # SZ pressure likelihood
+
+        if this_sz_data.sz_fit in ['Y', 'logY']:
+
+            Mhyd.logger.info(f'Compton y fit {this_sz_data.sz_fit}')
+
+            nout = 2 * nmore
+
+            rout_m_p = np.append(rout_m, np.logspace(np.log10(np.max(rout_m) * 1.1), np.log10(10000.), nout))
+            rin_m_p = np.append(rin_m, rout_m_p[ntm - 1:ntm - 1 + nout])
+
+            # Power-law extrapolation of the pressure beyond the grid, using the slope of the last nout points
+            slope = (pm.math.log(press_rout[ntm - 1]) - pm.math.log(press_rout[ntm - nout])) / (
+                    np.log(rout_m[ntm - 1]) - np.log(rout_m[ntm - nout]))
+
+            press_out = press_rout[ntm - 1] * (rout_m_p[ntm:] / rout_m[ntm - 1]) ** slope
+
+            press_p = pm.math.concatenate([press_rout, press_out], axis = 0)
+
+            proj_vol = MyDeprojVol(rin_m_p, rout_m_p).deproj_vol().T
+
+            area_proj = np.pi * (-(rin_m_p) ** 2 + (rout_m_p) ** 2)
+
+            integ = pm.math.dot(proj_vol, press_p) / area_proj * cgskpc
+
+            y_num = y_prefactor * integ  # prefactor in cm2/keV
+
+            yfit = y_num[index_sz] * eta
+
+            if this_sz_data.psfmat is not None:
+                yfit = pm.math.dot(this_sz_data.psfmat, yfit)
+
+            params[f'yfit_{i}'] = pm.Deterministic(f'yfit_{i}', yfit)
+
+            if this_sz_data.sz_fit == 'Y':
+                Y_obs = pm.MvNormal(f'Y_obs_{i}', mu = yfit, observed = this_sz_data.y_sz, cov = this_sz_data.covmat_sz)
+            else:
+                Y_obs = pm.MvNormal(f'Y_obs_{i}', mu = pm.math.log(yfit), observed = this_sz_data.logy_sz, cov = this_sz_data.covmat_sz)
 
 
 def get_ccf(params, Mhyd, dict_utils, conversion_factor_type):

@@ -9,8 +9,10 @@ from scipy import stats
 from getdist import MCSamples, plots
 
 from .get_delta import summarize_delta, write_delta_table, DELTA_COLUMNS
+from .constants import kev2erg, year
+from .pnt import get_data_file_path
 
-__all__ = ['compute_products', 'save_products', 'plot_fits', 'plot_likelihood', 'plot_mass', 'plot_mass_fractions', 'plot_corner', 'plot_thermodynamics']
+__all__ = ['compute_products', 'save_products', 'load_products', 'plot_fits', 'plot_likelihood', 'plot_mass', 'plot_mass_fractions', 'plot_corner', 'plot_thermodynamics']
 
 # Likelihood kinds: (figure title, short label, y label, log y axis)
 LIKELIHOOD_KINDS = {
@@ -18,6 +20,103 @@ LIKELIHOOD_KINDS = {
     'kt': ('Temperature', 'kT', 'kT [keV]', False),
     'metal': ('Metal abundance', 'Z', 'Z$_{Fe}$ [Z$_\\odot$]', False),
 }
+
+
+# Thermodynamic profiles plotted with a linear y axis (the slopes are negative), the others use a log y axis
+LINEAR_THERMO_KEYS = ['t3d_out', 'dlog_ne_dlog_r', 'dlog_t_dlog_r']
+
+# Metallicity grid of the cooling function table, see get_coolfunc
+Z_GRID_COOLFUNC = np.array([0., 0.02, 0.05, 0.08, 0.12, 0.16, 0.20, 0.25, 0.30, 0.35, 0.40, 0.48, 0.58, 0.70, 0.85, 1.0])
+
+
+def get_coolfunc(Z):
+    """
+    Retrieve the cooling function data from the internal data archive and return the cooling function profile for a given input metallicity
+
+    :param Z: Metallicity (relative to Anders & Grevesse; defaults to 0.3)
+    :type Z: float
+    :return: Cooling function profile and temperature grid
+    :rtype: numpy.ndarray
+    """
+    Z_grid = np.array([0., 0.02, 0.05, 0.08, 0.12, 0.16, 0.20, 0.25, 0.30, 0.35, 0.40, 0.48, 0.58, 0.70, 0.85, 1.0])
+
+    file_cf = get_data_file_path('coolfunc_table.fits')
+
+    fcf = fits.open(file_cf)
+
+    ind = np.searchsorted(Z_grid, Z, side='left')
+
+    if Z_grid[ind] < Z:
+
+        Zlow = Z_grid[ind]
+
+        Zhigh = Z_grid[ind + 1]
+
+    elif Z_grid[ind] > Z:
+
+        Zlow = Z_grid[ind - 1]
+
+        Zhigh = Z_grid[ind]
+
+    else:
+
+        Zlow = Z
+
+        Zhigh = Z
+
+    if Zlow != Zhigh:
+
+        hdulow = fcf['COOLFUNC_Z%1.2lf' % (Zlow)]
+
+        lambdalow = hdulow.data['LAMBDA']
+
+        ktgrid = hdulow.data['KT']
+
+        hduhigh = fcf['COOLFUNC_Z%1.2lf' % (Zhigh)]
+
+        lambdahigh = hduhigh.data['LAMBDA']
+
+        lambda_interp = lambdalow + (Z - Zlow) * (lambdahigh - lambdalow) / (Zhigh - Zlow)
+
+    else:
+
+        thdu = fcf['COOLFUNC_Z%1.2lf' % (Z)]
+
+        lambda_interp = thdu.data['LAMBDA']
+
+        ktgrid = thdu.data['KT']
+
+    return lambda_interp, ktgrid
+
+
+def _cooling_function(t3d, zfe):
+    '''
+    CLAUDE: Cooling function at temperatures t3d and metallicities zfe (same shape), linearly interpolated in kT on each table of
+    Z_GRID_COOLFUNC and then linearly in Z.
+    '''
+    lambdas = []
+    for Z in Z_GRID_COOLFUNC:
+        coolfunc, ktgrid = get_coolfunc(Z)
+        lambdas.append(np.interp(t3d, ktgrid, coolfunc))
+    lambdas = np.array(lambdas)
+
+    zfe = np.clip(zfe, Z_GRID_COOLFUNC[0], Z_GRID_COOLFUNC[-1])
+    iz = np.clip(np.searchsorted(Z_GRID_COOLFUNC, zfe), 1, len(Z_GRID_COOLFUNC) - 1)
+    w = (zfe - Z_GRID_COOLFUNC[iz - 1]) / (Z_GRID_COOLFUNC[iz] - Z_GRID_COOLFUNC[iz - 1])
+    lambda_lo = np.take_along_axis(lambdas, (iz - 1)[np.newaxis], axis = 0)[0]
+    lambda_hi = np.take_along_axis(lambdas, iz[np.newaxis], axis = 0)[0]
+    return lambda_lo * (1. - w) + lambda_hi * w
+
+
+def _rref_to_rout(values, rref_m, rout_m):
+    '''
+    CLAUDE: Linear interpolation along axis 0 of values (npoints, nsamples), given at rref_m, onto rout_m (constant beyond the last rref_m).
+    '''
+    pos = np.interp(rout_m, rref_m, np.arange(len(rref_m)))
+    i0 = np.floor(pos).astype(int)
+    i1 = np.minimum(i0 + 1, len(rref_m) - 1)
+    w = (pos - i0)[:, np.newaxis]
+    return values[i0] * (1. - w) + values[i1] * w
 
 
 # ---------------------------------------------------------------------------------------------------------------------
@@ -157,7 +256,7 @@ def compute_products(Mhyd, trace, dict_utils, tag, models_mass, model_mstar = No
     models = list(models_mass) + [m for m in (model_mstar, model_missing_mass) if m is not None]
     products['corner'] = _corner_inputs(trace, models, dict_utils)
 
-    # Thermodynamic profiles, all at the outer bin radii rout_m (entropy computed sample by sample)
+    # Thermodynamic profiles, all at the outer bin radii rout_m (entropy, cooling function, cooling time and logarithmic slopes computed sample by sample)
     products['rout_m'] = dict_utils['rout_m']
     # Outer edge of the outermost spectral bin, in kpc
     products['rmax_spec_kpc'] = max(np.max(d.rout_x_am) for d in Mhyd.spec_data) * Mhyd.amin2kpc if Mhyd.spec_data is not None else None
@@ -167,6 +266,19 @@ def compute_products(Mhyd, trace, dict_utils, tag, models_mass, model_mstar = No
         for key, label, values in [('ne_model_rout', 'n$_e$ [cm$^{-3}$]', ne), ('t3d_out', 'kT [keV]', t3d),
                                    ('press_rout', 'P [keV cm$^{-3}$]', press), ('entropy_rout', 'K = kT n$_e^{-2/3}$ [keV cm$^2$]', t3d / ne ** (2. / 3.))]:
             thermo.append(dict(key = key, label = label, band = np.percentile(values, [50., 50. - 68.3 / 2., 50. + 68.3 / 2.], axis = -1)))
+
+        rout_m = dict_utils['rout_m']
+        if 'zfe_model' in post:
+            zfe = _rref_to_rout(post['zfe_model'].values, rref_m, rout_m)
+        else:
+            zfe = np.full_like(t3d, 0.3)
+        lambda3d = _cooling_function(t3d, zfe)
+        tcool = 3. / 2. * ne * (1. + 1. / Mhyd.nhc) * t3d * kev2erg / (lambda3d * ne ** 2 / Mhyd.nhc) / year
+        dlog_ne_dlog_r = np.gradient(np.log(ne), np.log(rout_m), axis = 0)
+        dlog_t_dlog_r = np.gradient(np.log(t3d), np.log(rout_m), axis = 0)
+        for key, label, values in [('t_cool', 't$_{cool}$ [yr]', tcool), ('lambda', '$\\Lambda$(T, Z)', lambda3d),
+                                   ('dlog_ne_dlog_r', 'd ln n$_e$ / d ln r', dlog_ne_dlog_r), ('dlog_t_dlog_r', 'd ln T / d ln r', dlog_t_dlog_r)]:
+            thermo.append(dict(key = key, label = label, band = np.percentile(values, [50., 50. - 68.3 / 2., 50. + 68.3 / 2.], axis = -1)))
     products['thermo'] = thermo
 
     return products
@@ -175,8 +287,8 @@ def compute_products(Mhyd, trace, dict_utils, tag, models_mass, model_mstar = No
 def save_products(products, outfile):
     '''
     CLAUDE: Save the products of :func:`compute_products` to a FITS file, with extensions LIKELIHOOD_<KIND>_<i> (observed profile,
-    model band and fit mask), MASS (mass profiles), FRACTIONS (mass fractions) and DELTA (overdensity quantities).
-    The corner plot samples are not saved, they are in the trace.
+    model band and fit mask), MASS (mass profiles), FRACTIONS (mass fractions), THERMO (thermodynamic profiles) and DELTA (overdensity quantities).
+    The corner plot inputs are not saved. It can be read back with :func:`load_products`.
     '''
     hdus = fits.HDUList([fits.PrimaryHDU()])
     head = hdus[0].header
@@ -201,7 +313,7 @@ def save_products(products, outfile):
             hdus.append(fits.BinTableHDU.from_columns(cols, name = f'LIKELIHOOD_{kind.upper()}_{i}'))
 
     for extname, entries in [('MASS', products['mass']), ('FRACTIONS', products['fractions'])]:
-        cols = [fits.Column(name = 'RADIUS', format = 'E', unit = 'kpc', array = products['rref_m'])]
+        cols = [fits.Column(name = 'RREF', format = 'E', unit = 'kpc', array = products['rref_m'])]
         for entry in entries:
             for suffix, values in zip(['', '_LO', '_HI'], entry['band']):
                 cols.append(fits.Column(name = entry['key'].upper() + suffix, format = 'E', array = values))
@@ -213,11 +325,14 @@ def save_products(products, outfile):
         hdus.append(hdu)
 
     if len(products['thermo']) > 0:
-        cols = [fits.Column(name = 'RADIUS', format = 'E', unit = 'kpc', array = products['rout_m'])]
+        cols = [fits.Column(name = 'ROUT', format = 'E', unit = 'kpc', array = products['rout_m'])]
         for entry in products['thermo']:
             for suffix, values in zip(['', '_LO', '_HI'], entry['band']):
                 cols.append(fits.Column(name = entry['key'].upper() + suffix, format = 'E', array = values))
-        hdus.append(fits.BinTableHDU.from_columns(cols, name = 'THERMO'))
+        hdu = fits.BinTableHDU.from_columns(cols, name = 'THERMO')
+        for k, entry in enumerate(products['thermo']):
+            hdu.header[f'LABEL{k}'] = (entry['label'], entry['key'].upper())
+        hdus.append(hdu)
 
     if len(products['delta']) > 0:
         deltas = list(products['delta'].keys())
@@ -228,6 +343,69 @@ def save_products(products, outfile):
         hdus.append(fits.BinTableHDU.from_columns(cols, name = 'DELTA'))
 
     hdus.writeto(outfile, overwrite = True)
+
+
+def _load_bands(hdu):
+    '''
+    CLAUDE: Read the [{key, label, band}] entries of a MASS, FRACTIONS or THERMO extension written by :func:`save_products`.
+    The columns after the first one come in groups <KEY>, <KEY>_LO, <KEY>_HI; MSTAR_DATA is skipped. Labels default to the key if not in the header.
+    '''
+    names = [name for name in hdu.columns.names[1:] if name != 'MSTAR_DATA']
+    entries = []
+    for k, name in enumerate(names[::3]):
+        band = np.array([hdu.data[name], hdu.data[name + '_LO'], hdu.data[name + '_HI']])
+        key = name.lower()
+        entries.append(dict(key = key, label = hdu.header.get(f'LABEL{k}', key), band = band))
+    return entries
+
+
+def load_products(infile):
+    '''
+    CLAUDE: Read a products FITS file written by :func:`save_products` back into the products dictionary of :func:`compute_products`,
+    so that it can be plotted with :func:`plot_fits`. The corner plot inputs are not saved, so the 'corner' key is missing.
+
+    :param infile: products FITS file, e.g. <fit_dir>/<model_tag>_products.fits
+    :return: dictionary of products
+    '''
+    with fits.open(infile) as hdus:
+        head = hdus[0].header
+        products = dict(tag = head['MODEL'], rmin_kpc = head['RMIN_KPC'], rmax_kpc = head['RMAX_KPC'], fit_bkg = bool(head['FIT_BKG']),
+                        rmax_spec_kpc = head.get('RMAXSPEC', None))
+        extnames = [hdu.name for hdu in hdus[1:]]
+
+        likelihood = dict()
+        for hdu in hdus[1:]:
+            if not hdu.name.startswith('LIKELIHOOD_'):
+                continue
+            kind = hdu.name.split('_')[1].lower()
+            d = hdu.data
+            likelihood.setdefault(kind, []).append(dict(x = np.array(d['RADIUS']), xlo = np.array(d['RIN']), xhi = np.array(d['ROUT']),
+                                                        obs = np.array(d['OBS']), err = np.array(d['ERR']),
+                                                        band = np.array([d['MODEL'], d['MODEL_LO'], d['MODEL_HI']]),
+                                                        mask = np.array(d['FITTED'], dtype = bool)))
+        products['likelihood'] = likelihood
+
+        products['rref_m'] = np.array(hdus['MASS'].data.field(0))
+        products['mass'] = _load_bands(hdus['MASS'])
+        products['mstar_data'] = np.array(hdus['MASS'].data['MSTAR_DATA']) if 'MSTAR_DATA' in hdus['MASS'].columns.names else None
+        products['fractions'] = _load_bands(hdus['FRACTIONS'])
+
+        if 'THERMO' in extnames:
+            products['rout_m'] = np.array(hdus['THERMO'].data.field(0))
+            products['thermo'] = _load_bands(hdus['THERMO'])
+        else:
+            products['rout_m'] = None
+            products['thermo'] = []
+
+        delta = dict()
+        if 'DELTA' in extnames:
+            d = hdus['DELTA'].data
+            for j, value in enumerate(d['DELTA']):
+                key = int(value) if float(value).is_integer() else float(value)
+                delta[key] = {name: tuple(float(d[name.upper() + suffix][j]) for suffix in ['_LO', '', '_HI']) for name, fmt in DELTA_COLUMNS}
+        products['delta'] = delta
+
+    return products
 
 
 # ---------------------------------------------------------------------------------------------------------------------
@@ -516,7 +694,8 @@ def plot_corner(products_list, outfile = None):
 
 def plot_thermodynamics(products_list, outfile = None):
     '''
-    CLAUDE: Multipage pdf with the 3D density, temperature, pressure and entropy profiles at the outer bin radii rout_m, one quantity per page.
+    CLAUDE: Multipage pdf with the 3D density, temperature, pressure, entropy, cooling time, cooling function and logarithmic slopes of density
+    and temperature at the outer bin radii rout_m, one quantity per page. Temperature and slopes use a linear y axis, the others a log y axis.
     The outer radius of the spectral data (dotted) and R500 (dash-dotted) are marked.
     One fit: one band per page. Several fits: one color per fit. The fitted radial range is marked with vertical dashed lines.
     '''
@@ -545,11 +724,12 @@ def plot_thermodynamics(products_list, outfile = None):
                 ax.axvline(prod['delta'][500]['R_delta'][1], color = 'k' if single else f'C{m}', ls = '-.',
                            label = 'R$_{500}$' if single else f"R$_{{500}}$ {prod['tag']}")
         _mark_fit_range(ax, with_thermo[0])
-        if entry0['key'] != 't3d_out':
+        if entry0['key'] in LINEAR_THERMO_KEYS:
+            ymin, ymax = min(ylims), max(ylims)
+            ax.set_ylim(ymin - 0.1 * (ymax - ymin), ymax + 0.1 * (ymax - ymin))
+        else:
             ax.set_yscale('log')
             ax.set_ylim(0.5 * min(ylims), 2 * max(ylims))
-        else:
-            ax.set_ylim(0.9 * min(ylims), 1.1 * max(ylims))
         ax.set_ylabel(entry0['label'])
         ax.set_title('Thermodynamic profiles')
         _save_figure(fig, ax, None)
@@ -565,16 +745,24 @@ def plot_thermodynamics(products_list, outfile = None):
 
 def plot_fits(fits_list, outdir = None):
     '''
-    CLAUDE: Make all the plots (likelihood_<kind>.pdf, mass.pdf, mass_fractions.pdf, corner.pdf, thermodynamics.pdf) and the overdensity table (results.dat)
+    CLAUDE: Make all the plots (likelihood_<kind>.pdf, mass.pdf, mass_fractions.pdf, thermodynamics.pdf) and the overdensity table (results.dat)
     for one or several fits, overlaying the fits in the same plots.
     Each element of fits_list is either a products dictionary from :func:`compute_products` or an :class:`hydromass.mhyd.Mhyd` object
     on which :meth:`hydromass.mhyd.Mhyd.fit` was run (its products are in Mhyd.fit_products), e.g. deep copies of the same Mhyd object
-    fitted with different models.
+    fitted with different models. If Mhyd.fit_products is not set (the trace already existed), the products are read with
+    :func:`load_products` from <fit_dir>/<model_tag>_products.fits.
 
     :param fits_list: list of products or fitted Mhyd objects
     :param outdir: output directory. Default: the directory of the first Mhyd object, or the current directory for products
     '''
-    products_list = [getattr(item, 'fit_products', item) for item in fits_list]
+    products_list = []
+    for item in fits_list:
+        if isinstance(item, dict):
+            products_list.append(item)
+        elif getattr(item, 'fit_products', None) is not None:
+            products_list.append(item.fit_products)
+        else:
+            products_list.append(load_products(os.path.join(item.fit_dir, f'{os.path.basename(item.fit_dir)}_products.fits')))
     if outdir is None:
         outdir = getattr(fits_list[0], 'dir', '.')
     os.makedirs(outdir, exist_ok = True)
@@ -582,7 +770,6 @@ def plot_fits(fits_list, outdir = None):
     plot_likelihood(products_list, outdir)
     plot_mass(products_list, outfile = os.path.join(outdir, 'mass.pdf'))
     plot_mass_fractions(products_list, outfile = os.path.join(outdir, 'mass_fractions.pdf'))
-    plot_corner(products_list, outfile = os.path.join(outdir, 'corner.pdf'))
     plot_thermodynamics(products_list, outfile = os.path.join(outdir, 'thermodynamics.pdf'))
     with_delta = {prod['tag']: prod['delta'] for prod in products_list if len(prod['delta']) > 0}
     if len(with_delta) > 0:

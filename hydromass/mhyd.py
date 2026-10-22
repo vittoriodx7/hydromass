@@ -1,4 +1,5 @@
 import os
+import pprint
 
 os.environ["XLA_FLAGS"] = "--xla_force_host_platform_device_count=4"
 
@@ -44,9 +45,10 @@ from .wl import WLmodel
 from .pyutils import create_logger, warning
 from .conversion_factor_emissivity import calc_emissivity, ConversionFactor, FitCCFTable
 from .utility import sb_utils, common_utils, spec_utils, mass_utils, ccf_utils, forw_utils, gp_utils
-from .likelihoods import get_density, likelihood_sb, get_metal, likelihood_metal, kt_from_mass, likelihood_kt, get_ccf, kt_from_forw, kt_from_gp
+from .likelihoods import get_density, likelihood_sb, get_metal, likelihood_metal, kt_from_mass, likelihood_kt, likelihood_sz, get_ccf, kt_from_forw, kt_from_gp
 from .show_fit import compute_products, save_products, plot_likelihood, plot_mass, plot_mass_fractions, plot_corner, plot_thermodynamics
 from .get_delta import calc_delta_quantities
+from .model import Model
 
 
 __all__ = ['Run_Mhyd_PyMC3', 'Mhyd']
@@ -1383,6 +1385,29 @@ class Mhyd:
                     pl.close()
 
 
+    def store_fit_setup(self, fit_args):
+        '''
+        CLAUDE: Store the arguments of :meth:`fit` as a dictionary in self.fit_dir/setup.log.
+        Models are stored as a dictionary with their class name and attributes (functions excluded), numpy arrays as lists.
+
+        :param fit_args: Dictionary of the arguments passed to :meth:`fit`
+        '''
+        def to_setup(value):
+            if isinstance(value, Model):
+                return {'class': type(value).__name__, **{k: to_setup(v) for k, v in vars(value).items() if not callable(v)}}
+            if isinstance(value, np.ndarray):
+                return value.tolist()
+            if isinstance(value, (list, tuple)):
+                return type(value)(to_setup(v) for v in value)
+            if isinstance(value, dict):
+                return {k: to_setup(v) for k, v in value.items()}
+            return value
+
+        setup_path = os.path.join(self.fit_dir, 'setup.log')
+        with open(setup_path, 'w') as f:
+            f.write(pprint.pformat(to_setup(fit_args), sort_dicts=False) + '\n')
+        self.logger.info(f'Fit setup saved to {setup_path}')
+
     def fit(self,
             fit_SB=False, fit_bkg=False, bkglim_amin=None, backval=None,
             fit_Z_Ab=False, model_Z_Ab=None,
@@ -1460,25 +1485,21 @@ class Mhyd:
         :param deltas:
             Overdensities at which R_delta, M_delta, Mgas, Mstar and mass fractions are computed and saved to mdelta.dat. Default (2500, 1000, 500, 200)
         '''
-        if (fit_SB is False) and (fit_kT is False) and (fit_Z_Ab is False) and (fit_SZ is False) and (fit_WL is False):
-            raise ValueError('Nothing to do. At least one of [fit_SB, fit_kT, fit_Z_Ab, fit_SZ, fit_WL] must be set to True')
-
-        if fit_Z_Ab and model_Z_Ab is None:
-            raise ValueError('fit_Z_Ab is True but model_Z_Ab is not set')
-
-        dict_utils = common_utils(self, rmin_amin=rmin_amin, rmax_amin=rmax_amin)
-
-        sb_utils(self, dict_utils, sb_setup=sb_setup, fit_bkg=fit_bkg, bkglim_amin=bkglim_amin, backval=backval)
-
-        if fit_kT:
-            spec_utils(self, dict_utils)
-
-        # ccf_utils(self, dict_utils)
-
-        mass_utils(self, dict_utils, mstar=mstar, p0_prior=p0_prior, p0_type=p0_type)
+        # All the arguments of fit, stored in setup.log by store_fit
+        fit_args = {k: v for k, v in locals().items() if k != 'self'}
 
         # Name of the mass model combination, e.g. NFW+SERSIC, used in plot names and legends
         model_tag = '+'.join([m.massmod for m in models_mass] + [m.massmod for m in (model_mstar, model_missing_mass) if m is not None])
+        if fit_SB:
+            model_tag += '_SB'
+        if fit_kT:
+            model_tag += '_kT'
+        if fit_SZ:
+            model_tag += '_SZ'
+            if fit_eta:
+                model_tag += '_eta'
+        if fit_Z_Ab:
+            model_tag += '_Z'
 
         # All the outputs of this fit go to a folder named after the model combination
         self.fit_dir = os.path.join(self.dir, model_tag)
@@ -1486,6 +1507,27 @@ class Mhyd:
 
         trace_path = os.path.join(self.fit_dir, f'trace_{model_tag}.nc')
         if not os.path.isfile(trace_path):
+            self.store_fit_setup(fit_args)
+
+            if (fit_SB is False) and (fit_kT is False) and (fit_Z_Ab is False) and (fit_SZ is False) and (fit_WL is False):
+                raise ValueError('Nothing to do. At least one of [fit_SB, fit_kT, fit_Z_Ab, fit_SZ, fit_WL] must be set to True')
+
+            if fit_Z_Ab and model_Z_Ab is None:
+                raise ValueError('fit_Z_Ab is True but model_Z_Ab is not set')
+
+            dict_utils = common_utils(self, rmin_amin=rmin_amin, rmax_amin=rmax_amin)
+
+            sb_utils(self, dict_utils, sb_setup=sb_setup, fit_bkg=fit_bkg, bkglim_amin=bkglim_amin, backval=backval)
+
+            if fit_kT:
+                spec_utils(self, dict_utils)
+
+            # ccf_utils(self, dict_utils)
+
+            mass_utils(self, dict_utils, mstar=mstar, p0_prior=p0_prior, p0_type=p0_type)
+
+
+
             hydro_model = pm.Model()
             with hydro_model:
                 params = dict()
@@ -1501,6 +1543,9 @@ class Mhyd:
 
                 if fit_kT:
                     likelihood_kt(params, self, dict_utils)
+
+                if fit_SZ:
+                    likelihood_sz(params, self, dict_utils, fit_eta=fit_eta)
 
                 get_ccf(params, self, dict_utils, self.conversion_factor_type)
 
@@ -1528,26 +1573,25 @@ class Mhyd:
             az.to_netcdf(trace, trace_path)
             self.logger.info(f'InferenceData saved to {trace_path}')
 
-        trace = az.from_netcdf(trace_path)
+
+            # trace = az.from_netcdf(trace_path)
 
 
+            self.delta_results = calc_delta_quantities(self, trace, dict_utils, model_mstar=model_mstar, mstar=mstar, deltas=deltas,
+                                                       outfile=os.path.join(self.fit_dir, f'{model_tag}_results.dat'))
 
+            # Everything needed for the plots; several fitted Mhyd objects can be plotted together with hydromass.show_fit.plot_fits
+            self.fit_products = compute_products(self, trace, dict_utils, model_tag, models_mass, model_mstar=model_mstar, mstar=mstar,
+                                                 model_missing_mass=model_missing_mass, fit_SB=fit_SB, fit_kT=fit_kT, fit_Z_Ab=fit_Z_Ab,
+                                                 fit_bkg=fit_bkg, delta_results=self.delta_results)
 
+            save_products(self.fit_products, os.path.join(self.fit_dir, f'{model_tag}_products.fits'))
 
-        self.delta_results = calc_delta_quantities(self, trace, dict_utils, model_mstar=model_mstar, mstar=mstar, deltas=deltas,
-                                                   outfile=os.path.join(self.fit_dir, f'{model_tag}_results.dat'))
-
-        # Everything needed for the plots; several fitted Mhyd objects can be plotted together with hydromass.show_fit.plot_fits
-        self.fit_products = compute_products(self, trace, dict_utils, model_tag, models_mass, model_mstar=model_mstar, mstar=mstar,
-                                             model_missing_mass=model_missing_mass, fit_SB=fit_SB, fit_kT=fit_kT, fit_Z_Ab=fit_Z_Ab,
-                                             fit_bkg=fit_bkg, delta_results=self.delta_results)
-        save_products(self.fit_products, os.path.join(self.fit_dir, f'{model_tag}_products.fits'))
-
-        plot_likelihood([self.fit_products], self.fit_dir, suffix=f'_{model_tag}')
-        plot_mass([self.fit_products], outfile=os.path.join(self.fit_dir, f'mass_{model_tag}.pdf'))
-        plot_mass_fractions([self.fit_products], outfile=os.path.join(self.fit_dir, f'mass_fractions_{model_tag}.pdf'))
-        plot_corner([self.fit_products], outfile=os.path.join(self.fit_dir, f'corner_{model_tag}.pdf'))
-        plot_thermodynamics([self.fit_products], outfile=os.path.join(self.fit_dir, f'thermodynamics_{model_tag}.pdf'))
+            plot_likelihood([self.fit_products], self.fit_dir, suffix=f'_{model_tag}')
+            plot_mass([self.fit_products], outfile=os.path.join(self.fit_dir, f'mass_{model_tag}.pdf'))
+            plot_mass_fractions([self.fit_products], outfile=os.path.join(self.fit_dir, f'mass_fractions_{model_tag}.pdf'))
+            plot_corner([self.fit_products], outfile=os.path.join(self.fit_dir, f'corner_{model_tag}.pdf'))
+            plot_thermodynamics([self.fit_products], outfile=os.path.join(self.fit_dir, f'thermodynamics_{model_tag}.pdf'))
 
 
 
