@@ -414,11 +414,11 @@ def calc_grad_operator(rfit, pars, withbkg = True):
     if withbkg:
         nptot = len(rfit)
         Ktot = np.zeros((nptot, npars + 1))
-        Ktot[0:npt, 0:npars] = grad.T
+        Ktot[0:npt, 0:npars] = grad
         Ktot[:, npars] = 0.0
 
     else:
-        Ktot = grad.T
+        Ktot = grad
 
     return Ktot
 
@@ -579,7 +579,7 @@ class MyDeprojVol:
                 volmat[ishell,iring]=volconst * (f1*ro[ishell]**3 - f2*ri[ishell]**3)
 
                 if volmat[ishell,iring] < 0.0:
-                    print('exit')
+                    print('exit: MyDeprojVol error')
                     sys.exit()
 
         volume2=np.copy(volmat)

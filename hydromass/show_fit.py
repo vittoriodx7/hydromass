@@ -5,6 +5,8 @@ import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_pdf import PdfPages
 from astropy.io import fits
+import arviz as az
+import xarray as xr
 from scipy import stats
 from getdist import MCSamples, plots
 
@@ -12,18 +14,22 @@ from .get_delta import summarize_delta, write_delta_table, DELTA_COLUMNS
 from .constants import kev2erg, year
 from .pnt import get_data_file_path
 
-__all__ = ['compute_products', 'save_products', 'load_products', 'plot_fits', 'plot_likelihood', 'plot_mass', 'plot_mass_fractions', 'plot_corner', 'plot_thermodynamics']
+__all__ = ['compute_products', 'save_products', 'load_products', 'plot_fits', 'compare_fits', 'plot_likelihood', 'plot_mass', 'plot_mass_fractions', 'plot_corner', 'plot_thermodynamics']
 
 # Likelihood kinds: (figure title, short label, y label, log y axis)
 LIKELIHOOD_KINDS = {
     'sb': ('Surface brightness', 'SB', 'Surface brightness', True),
     'kt': ('Temperature', 'kT', 'kT [keV]', False),
     'metal': ('Metal abundance', 'Z', 'Z$_{Fe}$ [Z$_\\odot$]', False),
+    'psz': ('SZ pressure', 'P$_{SZ}$', 'P [keV cm$^{-3}$]', True),
+    'ysz': ('Compton y', 'y', 'Compton y', True),
 }
 
 
 # Thermodynamic profiles plotted with a linear y axis (the slopes are negative), the others use a log y axis
 LINEAR_THERMO_KEYS = ['t3d_out', 'dlog_ne_dlog_r', 'dlog_t_dlog_r']
+# Physical range of the y axis of the logarithmic slopes: the axis follows the bands but never goes beyond it
+SLOPE_YRANGE = {'dlog_ne_dlog_r': (-6., 1.), 'dlog_t_dlog_r': (-5., 1.)}
 
 # Metallicity grid of the cooling function table, see get_coolfunc
 Z_GRID_COOLFUNC = np.array([0., 0.02, 0.05, 0.08, 0.12, 0.16, 0.20, 0.25, 0.30, 0.35, 0.40, 0.48, 0.58, 0.70, 0.85, 1.0])
@@ -150,9 +156,28 @@ def _likelihood_dataset(data, obs, err, band, mask):
     return dict(x = data.rref_x_am, xlo = data.rin_x_am, xhi = data.rout_x_am, obs = obs, err = err, band = band, mask = mask)
 
 
+def _likelihood_sz_dataset(trace, sz_data, i):
+    '''
+    CLAUDE: Observed profile, model band and fit mask of one SZ dataset (see :func:`hydromass.likelihoods.likelihood_sz`), in linear units.
+    The kind is 'psz' for the pressure fits ('P', 'logP', model pfit_<i>) and 'ysz' for the Compton y fits ('Y', 'logY', model yfit_<i>).
+    The errors are the square root of the diagonal of covmat_sz; for the log fits covmat_sz is in log space, so err = obs * sigma_log.
+    The residuals of the plots therefore ignore the correlations between bins. All the points are fitted.
+    '''
+    if sz_data.sz_fit in ['P', 'logP']:
+        kind, band = 'psz', _posterior_band(trace, f'pfit_{i}')
+        obs = sz_data.pres_sz if sz_data.sz_fit == 'P' else np.exp(sz_data.logp_sz)
+    else:
+        kind, band = 'ysz', _posterior_band(trace, f'yfit_{i}')
+        obs = sz_data.y_sz if sz_data.sz_fit == 'Y' else np.exp(sz_data.logy_sz)
+    sigma = np.sqrt(np.diag(sz_data.covmat_sz))
+    err = sigma if sz_data.sz_fit in ['P', 'Y'] else obs * sigma
+    ds = dict(x = sz_data.rref_sz_am, xlo = sz_data.rin_sz_am, xhi = sz_data.rout_sz_am, obs = obs, err = err, band = band, mask = np.ones(len(obs), dtype = bool))
+    return kind, ds
+
+
 def _corner_inputs(trace, models, dict_utils):
     '''
-    CLAUDE: Samples, getdist names, labels, ranges and priors of the free parameters of models (and logp0) for the corner plot.
+    CLAUDE: Samples, getdist names, labels, ranges and priors of the free parameters of models (and logpout) for the corner plot.
     '''
     post = trace.posterior.stack(sample = ('chain', 'draw'))
 
@@ -171,14 +196,14 @@ def _corner_inputs(trace, models, dict_utils):
                 ranges[name] = [float(model.limits[i][0]), float(model.limits[i][1])]
             priors.append((model.prior[i], model.start[i], model.sd[i], model.limits[i][0], model.limits[i][1]))
 
-    if 'logp0' in post:
+    if 'logpout' in post:
         # Same prior as in hydromass.likelihoods.kt_from_mass
         P0_est, err_P0_est = dict_utils['P0_est'], dict_utils['err_P0_est']
         lower, upper = np.log(P0_est) - 2 * np.log(10), np.log(P0_est) + 2 * np.log(10)
-        data.append(post['logp0'].values)
-        names.append('logp0')
-        labels.append('\\log P_0')
-        ranges['logp0'] = [lower, upper]
+        data.append(post['logpout'].values)
+        names.append('logpout')
+        labels.append('\\log P_{out}')
+        ranges['logpout'] = [lower, upper]
         priors.append(('TruncatedNormal', np.log(P0_est), err_P0_est / P0_est, lower, upper))
 
     samples = np.array(data).T if len(data) > 0 else np.zeros((0, 0))
@@ -186,7 +211,7 @@ def _corner_inputs(trace, models, dict_utils):
 
 
 def compute_products(Mhyd, trace, dict_utils, tag, models_mass, model_mstar = None, mstar = None, model_missing_mass = None,
-                     fit_SB = False, fit_kT = False, fit_Z_Ab = False, fit_bkg = False, delta_results = None):
+                     fit_SB = False, fit_kT = False, fit_Z_Ab = False, fit_SZ = False, fit_bkg = False, delta_results = None):
     '''
     CLAUDE: Compute from the trace of a fit everything needed by the plots of this module (likelihood profiles, mass profiles,
     mass fractions, overdensity quantities, corner plot inputs). The result can be plotted alone or together with other fits
@@ -224,6 +249,10 @@ def compute_products(Mhyd, trace, dict_utils, tag, models_mass, model_mstar = No
             band = _posterior_band(trace, 'zfe_model', index = index_x)
             mask = _fit_mask(valid_spec, len(this_spec_data.zfe))
             likelihood['metal'].append(_likelihood_dataset(this_spec_data, this_spec_data.zfe, this_spec_data.errt_zfe, band, mask))
+    if fit_SZ:
+        for i, this_sz_data in enumerate(Mhyd.sz_data):
+            kind, ds = _likelihood_sz_dataset(trace, this_sz_data, i)
+            likelihood.setdefault(kind, []).append(ds)
     products['likelihood'] = likelihood
 
     # Mass profiles
@@ -274,8 +303,15 @@ def compute_products(Mhyd, trace, dict_utils, tag, models_mass, model_mstar = No
             zfe = np.full_like(t3d, 0.3)
         lambda3d = _cooling_function(t3d, zfe)
         tcool = 3. / 2. * ne * (1. + 1. / Mhyd.nhc) * t3d * kev2erg / (lambda3d * ne ** 2 / Mhyd.nhc) / year
-        dlog_ne_dlog_r = np.gradient(np.log(ne), np.log(rout_m), axis = 0)
-        dlog_t_dlog_r = np.gradient(np.log(t3d), np.log(rout_m), axis = 0)
+        # Analytic slopes when the fit saved them (e.g. forward fits), otherwise numerical
+        if 'dlog_ne_dlog_r' in post:
+            dlog_ne_dlog_r = post['dlog_ne_dlog_r'].values
+        else:
+            dlog_ne_dlog_r = np.gradient(np.log(ne), np.log(rout_m), axis = 0)
+        if 'dlog_t_dlog_r' in post:
+            dlog_t_dlog_r = post['dlog_t_dlog_r'].values
+        else:
+            dlog_t_dlog_r = np.gradient(np.log(t3d), np.log(rout_m), axis = 0)
         for key, label, values in [('t_cool', 't$_{cool}$ [yr]', tcool), ('lambda', '$\\Lambda$(T, Z)', lambda3d),
                                    ('dlog_ne_dlog_r', 'd ln n$_e$ / d ln r', dlog_ne_dlog_r), ('dlog_t_dlog_r', 'd ln T / d ln r', dlog_t_dlog_r)]:
             thermo.append(dict(key = key, label = label, band = np.percentile(values, [50., 50. - 68.3 / 2., 50. + 68.3 / 2.], axis = -1)))
@@ -456,7 +492,7 @@ def _draw_data(ax, ax_res, ds, res, color, label, xshift = 1.):
 
 def _plot_likelihood_kind(products_list, kind, outfile = None):
     '''
-    CLAUDE: Model vs observed plot of one likelihood kind ('sb', 'kt' or 'metal') for one or several fits.
+    CLAUDE: Model vs observed plot of one likelihood kind ('sb', 'kt', 'metal', 'psz' or 'ysz') for one or several fits.
     One fit: one color per dataset, excluded points in gray. Several fits: data in black, one color per fit for model and residuals.
     '''
     fig_title, short, ylabel, logy = LIKELIHOOD_KINDS[kind]
@@ -637,7 +673,7 @@ def _prior_pdf(prior_type, mu, sigma, lower, upper, x):
 
 def plot_corner(products_list, outfile = None):
     '''
-    CLAUDE: Corner plot (based on :func:`hydromass.contour.make_corner`) of the free mass model parameters and logp0.
+    CLAUDE: Corner plot (based on :func:`hydromass.contour.make_corner`) of the free mass model parameters and logpout.
     One fit: the prior of each parameter is drawn as a solid red line on the 1D posteriors on the diagonal; flat priors are drawn at half the height of the posterior peak.
     Several fits: the posteriors are overlaid, one color per fit, without priors; parameters missing in a fit are shown for the other fits only.
     '''
@@ -726,7 +762,11 @@ def plot_thermodynamics(products_list, outfile = None):
         _mark_fit_range(ax, with_thermo[0])
         if entry0['key'] in LINEAR_THERMO_KEYS:
             ymin, ymax = min(ylims), max(ylims)
-            ax.set_ylim(ymin - 0.1 * (ymax - ymin), ymax + 0.1 * (ymax - ymin))
+            ymin, ymax = ymin - 0.1 * (ymax - ymin), ymax + 0.1 * (ymax - ymin)
+            if entry0['key'] in SLOPE_YRANGE:
+                lower, upper = SLOPE_YRANGE[entry0['key']]
+                ymin, ymax = max(ymin, lower), min(ymax, upper)
+            ax.set_ylim(ymin, ymax)
         else:
             ax.set_yscale('log')
             ax.set_ylim(0.5 * min(ylims), 2 * max(ylims))
@@ -774,3 +814,102 @@ def plot_fits(fits_list, outdir = None):
     with_delta = {prod['tag']: prod['delta'] for prod in products_list if len(prod['delta']) > 0}
     if len(with_delta) > 0:
         write_delta_table(with_delta, os.path.join(outdir, 'results.dat'))
+
+
+# ---------------------------------------------------------------------------------------------------------------------
+# Model comparison (LOO / WAIC) of several fits of the same data
+# ---------------------------------------------------------------------------------------------------------------------
+
+def _load_traces(fits_list):
+    '''
+    CLAUDE: {tag: InferenceData} of the fits to compare. fits_list is either a dictionary {tag: InferenceData} or a list of
+    :class:`hydromass.mhyd.Mhyd` objects on which :meth:`hydromass.mhyd.Mhyd.fit` was run; their trace is read from <fit_dir>/trace_<model_tag>.nc.
+    '''
+    if isinstance(fits_list, dict):
+        return dict(fits_list)
+    traces = dict()
+    for item in fits_list:
+        tag = os.path.basename(item.fit_dir)
+        if tag in traces:
+            raise ValueError(f'Fit {tag} is given twice')
+        traces[tag] = az.from_netcdf(os.path.join(item.fit_dir, f'trace_{tag}.nc'))
+    return traces
+
+
+def _combined_log_likelihood(trace, var_names):
+    '''
+    CLAUDE: InferenceData with a single log likelihood variable 'total', the pointwise log likelihoods of var_names concatenated
+    (a multivariate likelihood, e.g. the SZ MvNormal, counts as one point).
+    '''
+    ll = trace.log_likelihood
+    nchain, ndraw = ll.sizes['chain'], ll.sizes['draw']
+    total = np.concatenate([ll[name].values.reshape(nchain, ndraw, -1) for name in var_names], axis = -1)
+    log_likelihood = xr.Dataset({'total': (('chain', 'draw', 'total_dim_0'), total)},
+                                coords = dict(chain = ll['chain'].values, draw = ll['draw'].values))
+    return az.InferenceData(posterior = trace.posterior, log_likelihood = log_likelihood)
+
+
+def compare_fits(fits_list, outdir = None, ic = 'loo'):
+    '''
+    CLAUDE: Compare several fits with :func:`arviz.compare` (LOO or WAIC), separately for each likelihood (e.g. sb_obs_0, T_obs_0, Z_Fe_obs_0)
+    and for all the likelihoods together ('total'). Each comparison is written to <outdir>/comparison_<name>.dat and returned.
+
+    Checks, raising ValueError if they fail:
+        - every fit has a log_likelihood group (fits run before it was computed in :meth:`hydromass.mhyd.Mhyd.fit` must be rerun);
+        - the fits sharing a likelihood have the same observed data points (same values, i.e. same data and same fitted radial range).
+    A likelihood present in fewer than two fits is skipped. A likelihood with a single point per sample (e.g. the SZ MvNormal) is skipped
+    on its own, since LOO/WAIC needs pointwise terms, but is included in 'total'. 'total' is computed only if all the fits have the same likelihoods.
+
+    :param fits_list: list of fitted :class:`hydromass.mhyd.Mhyd` objects, or dictionary {tag: InferenceData}
+    :param outdir: output directory. Default: the directory of the first Mhyd object, or the current directory for a dictionary
+    :param ic: information criterion, 'loo' or 'waic'. Default 'loo'
+    :return: dictionary {likelihood name or 'total': comparison DataFrame}
+    '''
+    traces = _load_traces(fits_list)
+    if len(traces) < 2:
+        raise ValueError('At least two fits are needed for a comparison')
+    if outdir is None:
+        outdir = '.' if isinstance(fits_list, dict) else getattr(fits_list[0], 'dir', '.')
+    os.makedirs(outdir, exist_ok = True)
+
+    missing = [tag for tag, trace in traces.items() if 'log_likelihood' not in trace.groups()]
+    if len(missing) > 0:
+        raise ValueError(f'No log_likelihood group in the trace of {missing}: rerun these fits')
+
+    # Likelihoods of each fit, in the order they first appear
+    var_names = []
+    for trace in traces.values():
+        var_names += [name for name in trace.log_likelihood.data_vars if name not in var_names]
+
+    comparisons = dict()
+    for name in var_names:
+        tags = [tag for tag, trace in traces.items() if name in trace.log_likelihood]
+        if len(tags) < 2:
+            print(f'compare_fits: {name} is only in {tags}, skipped')
+            continue
+
+        # Same observed data points in all the fits
+        obs0 = traces[tags[0]].observed_data[name].values
+        for tag in tags[1:]:
+            obs = traces[tag].observed_data[name].values
+            if obs.shape != obs0.shape or not np.allclose(obs, obs0, rtol = 1e-6, atol = 0):
+                raise ValueError(f'Observed data of {name} differ between {tags[0]} ({obs0.size} points) and {tag} ({obs.size} points): '
+                                 f'the fits are not on the same data')
+
+        npoints = traces[tags[0]].log_likelihood[name].values[0, 0].size
+        if npoints < 2:
+            print(f'compare_fits: {name} has a single log likelihood term per sample (multivariate likelihood), only used in total')
+            continue
+
+        comparisons[name] = az.compare({tag: traces[tag] for tag in tags}, ic = ic, var_name = name)
+
+    if all(set(trace.log_likelihood.data_vars) == set(var_names) for trace in traces.values()):
+        comparisons['total'] = az.compare({tag: _combined_log_likelihood(trace, var_names) for tag, trace in traces.items()}, ic = ic, var_name = 'total')
+    else:
+        print('compare_fits: the fits do not have the same likelihoods, total comparison skipped')
+
+    for name, df in comparisons.items():
+        with open(os.path.join(outdir, f'comparison_{name}.dat'), 'w') as f:
+            print(df.to_string(), file = f)
+
+    return comparisons

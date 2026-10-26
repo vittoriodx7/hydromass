@@ -1,5 +1,6 @@
 from curses import has_key
 
+import ipdb
 import numpy as np
 import copy
 import pymc as pm
@@ -10,7 +11,7 @@ from scipy.optimize import minimize
 # from .deproject import list_params, calc_linear_operator, calc_sb_operator, calc_density_operator, MyDeprojVol, calc_grad_operator
 from .deproject import MyDeprojVol, calc_linear_operator, calc_density_operator, calc_grad_operator
 
-__all__ = ['rads_more', 'list_params', 'sb_utils', 'spec_utils', 'common_utils', 'mass_utils', 'mgas_pm']
+__all__ = ['rads_more', 'list_params', 'sb_utils', 'spec_utils', 'common_utils', 'mass_utils', 'mgas_pm', 'sum_mat_sz']
 
 # Function to create the list of parameters for the basis functions
 nsh = 4.  # number of basis functions to set
@@ -272,6 +273,8 @@ def rads_more(Mhyd, nmore=5, extend=False):
         - index_x, index_sz: lists of indices corresponding to the position of the input values in the grid
         - sum_mat: matrix containing the number of values in each subgrid bin
         - ntm: total number of grid points
+        - rin_p, rout_p: the fine grid extended with 2 * nmore shells out to 10 Mpc for the Compton y projection (None without SZ data)
+        - sum_mat_sz_list: list of (integration matrix, area factor) from :func:`sum_mat_sz` on the extended grid, one per SZ data set
     """
 
     rout_joint = np.array([])
@@ -297,8 +300,10 @@ def rads_more(Mhyd, nmore=5, extend=False):
         print('No loaded SZ or X-ray data found in input hydromass.Mhyd object, nothing to do')
         return
 
-    rin_joint = np.roll(rout_joint, 1)
+    rout_joint = np.sort(np.unique(np.round(rout_joint, decimals=6)))
+    rref_joint = np.sort(np.unique(np.round(rref_joint, decimals=6)))
 
+    rin_joint = np.roll(rout_joint, 1)
     rin_joint[0] = 0.
 
     njoint = len(rref_joint)
@@ -306,10 +311,11 @@ def rads_more(Mhyd, nmore=5, extend=False):
     tot_joint = np.sort(np.unique(np.round(np.append(rin_joint, rref_joint), decimals=6)))
     # unique needed if there is overlap in in-out or rref-rin
     # round needed for decimal rounding
-
     ntotjoint = len(tot_joint)
 
-    ntm = int((ntotjoint - 0.5) * nmore)
+    ntail = max(1, int(nmore / 2.)) # fix added for nmore=1 case. nmore>=2 is the same
+
+    ntm = (ntotjoint - 1) * nmore + ntail
 
     rout_more = np.empty(ntm)
 
@@ -317,7 +323,7 @@ def rads_more(Mhyd, nmore=5, extend=False):
 
         rout_more[i * nmore:(i + 1) * nmore] = np.linspace(tot_joint[i], tot_joint[i + 1], nmore + 1)[1:]
 
-    rout_more[(ntotjoint - 1) * nmore:] = np.linspace(rref_joint[njoint - 1], rout_joint[njoint - 1], int(nmore / 2.) + 1)[1:]
+    rout_more[(ntotjoint - 1) * nmore:] = np.linspace(tot_joint[-1], rout_joint[-1], ntail + 1)[1:]
 
     # Move the outer boundary to the edge of the SB profile if it is farther out
     if Mhyd.max_rad_kpc > np.max(rout_more):
@@ -333,8 +339,8 @@ def rads_more(Mhyd, nmore=5, extend=False):
 
         ntm = len(rout_more)
 
-    rin_more = np.roll(rout_more, 1)
 
+    rin_more = np.roll(rout_more, 1)
     rin_more[0] = 0
 
     index_sb_list, index_kt_list, index_sz_list = [], [], []
@@ -458,8 +464,55 @@ def rads_more(Mhyd, nmore=5, extend=False):
 
         sum_mat_sb_list.append(sum_mat_sb)
 
+    # Extended grid out to 10 Mpc for the projection of the pressure into the Compton y profile, and SZ bin integration matrices on it
+    rin_more_p, rout_more_p, sum_mat_sz_list = None, None, []
 
-    return rin_more, rout_more, index_kt_list, index_sz_list, sum_mat_kt_list, ntm, index_sb_list, sum_mat_sb_list
+    if Mhyd.sz_data is not None:
+
+        nout = 2 * nmore
+
+        rout_more_p = np.append(rout_more, np.logspace(np.log10(np.max(rout_more) * 1.1), np.log10(10000.), nout))
+        rin_more_p = np.append(rin_more, rout_more_p[ntm - 1:ntm - 1 + nout])
+
+        for this_sz_data in Mhyd.sz_data:
+
+            sum_mat_sz_list.append(sum_mat_sz(this_sz_data, rin_more_p, rout_more_p))
+
+    return rin_more, rout_more, index_kt_list, index_sz_list, sum_mat_kt_list, ntm, index_sb_list, sum_mat_sb_list, rin_more_p, rout_more_p, sum_mat_sz_list
+
+def sum_mat_sz(sz_data, rin_m, rout_m):
+    '''
+    CLAUDE: Integration matrix for the SZ profile, adapted from :func:`hydromass.plots.sum_mat_sz` (upstream commit e2f59f4).
+    Each row selects the fine-grid annuli whose inner edge falls in the corresponding SZ bin, weighted by their projected area,
+    so that dot(sum_mat, y) / area_tot is the area-weighted average of y in each SZ bin.
+
+    :param sz_data: SZ data set (one element of Mhyd.sz_data), with bin edges rin_sz_kpc and rout_sz_kpc
+    :type sz_data: class:`hydromass.tpdata.SZData`
+    :param rin_m: Inner radial bins in kpc
+    :type rin_m: numpy.ndarray
+    :param rout_m: Outer radial bins in kpc
+    :type rout_m: numpy.ndarray
+    :return: Integration matrix and area factor
+    :rtype: numpy.ndarray
+    '''
+    ntot = len(rout_m)
+
+    nsz = len(sz_data.rref_sz_kpc)
+
+    sum_mat = np.zeros((nsz, ntot))
+
+    area_proj = np.pi * (rout_m ** 2 - rin_m ** 2)
+
+    area_tot = np.empty(nsz)
+
+    for i in range(nsz):
+        ix = np.where(np.logical_and(rin_m < sz_data.rout_sz_kpc[i], rin_m >= sz_data.rin_sz_kpc[i]))
+
+        sum_mat[i, :][ix] = area_proj[ix]
+
+        area_tot[i] = np.sum(area_proj[ix])
+
+    return sum_mat, area_tot
 
 def cumsum_mat(nval):
     """
@@ -489,7 +542,7 @@ def common_utils(Mhyd, nmore=5, rmax_amin=None, rmin_amin=None):
         rmin_amin = 0
 
     dict_common_utils = dict()
-    rin_m, rout_m, index_kt_list, index_sz_list, sum_mat_kt_list, ntm, index_sb_list, sum_mat_sb_list = rads_more(Mhyd, nmore=nmore)
+    rin_m, rout_m, index_kt_list, index_sz_list, sum_mat_kt_list, ntm, index_sb_list, sum_mat_sb_list, rin_m_p, rout_m_p, sum_mat_sz_list = rads_more(Mhyd, nmore=nmore)
 
     rref_m = (rin_m + rout_m) / 2.
     volmat = np.array(MyDeprojVol(rin_m / Mhyd.amin2kpc, rout_m / Mhyd.amin2kpc).deproj_vol().T)
@@ -504,6 +557,9 @@ def common_utils(Mhyd, nmore=5, rmax_amin=None, rmin_amin=None):
     dict_common_utils['ntm'] = ntm
     dict_common_utils['index_sb_list'] = index_sb_list
     dict_common_utils['sum_mat_sb_list'] = sum_mat_sb_list
+    dict_common_utils['rin_m_p'] = rin_m_p
+    dict_common_utils['rout_m_p'] = rout_m_p
+    dict_common_utils['sum_mat_sz_list'] = sum_mat_sz_list
 
     dict_common_utils['rmax_amin'] = rmax_amin
     dict_common_utils['rmin_amin'] = rmin_amin
@@ -636,6 +692,7 @@ def sb_utils(Mhyd, dict_utils, fit_bkg=False, bkglim_amin=None, backval=None, sb
         proj_mat_sb = np.dot(np.dot(this_sb_data.psfmat, sum_mat_sb), volmat)
 
         proj_mat_sb_list.append(proj_mat_sb)
+
 
     testvals = np.array([])
     # Set up initial values

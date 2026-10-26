@@ -596,6 +596,8 @@ def fit_poly2d_numpyro(
         kernel,
         num_warmup = num_warmup,
         num_samples = num_samples,
+        num_chains=1
+        #chain_method = 'vectorized'
     )
 
     rng_key = jrandom.PRNGKey(rng_seed)
